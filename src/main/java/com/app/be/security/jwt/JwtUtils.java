@@ -31,6 +31,10 @@ public class JwtUtils {
     @Value("${jwt.expiration:2592000000}")
     private long jwtExpiration;
 
+    public long getJwtExpiration() {
+        return jwtExpiration;
+    }
+
     /**
      * Generate standard 30-day token for User entity.
      */
