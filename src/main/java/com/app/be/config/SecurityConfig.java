@@ -53,6 +53,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/orders/my-orders").authenticated()
 
+                        // Auth me endpoint (requires authentication)
+                        .requestMatchers("/api/auth/me").authenticated()
+
                         // Public endpoints
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
