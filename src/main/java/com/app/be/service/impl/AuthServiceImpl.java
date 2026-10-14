@@ -13,6 +13,9 @@ import com.app.be.security.jwt.JwtUtils;
 import com.app.be.security.user.CustomUserDetails;
 import com.app.be.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,7 +34,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public UserResponse register(RegisterRequest request) {
         String email = request.getEmail().trim().toLowerCase();
 
         if (userRepository.existsByEmail(email)) {
@@ -51,17 +54,12 @@ public class AuthServiceImpl implements AuthService {
         user.setRole("ROLE_CUSTOMER"); // Default role
 
         User savedUser = userRepository.save(user);
-        String token = jwtUtils.generateToken(savedUser);
 
-        return AuthResponse.builder()
-                .accessToken(token)
-                .tokenType("Bearer")
-                .user(UserResponse.fromEntity(savedUser))
-                .build();
+        return UserResponse.fromEntity(savedUser);
     }
 
     @Override
-    public AuthResponse login(LoginRequest request) {
+    public UserResponse login(LoginRequest request, HttpServletResponse response) {
         String email = request.getEmail().trim().toLowerCase();
 
         authenticationManager.authenticate(
@@ -73,11 +71,30 @@ public class AuthServiceImpl implements AuthService {
 
         String token = jwtUtils.generateToken(user);
 
-        return AuthResponse.builder()
-                .accessToken(token)
-                .tokenType("Bearer")
-                .user(UserResponse.fromEntity(user))
+        ResponseCookie cookie = ResponseCookie.from("accessToken", token)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(jwtUtils.getJwtExpiration() / 1000)
+                .sameSite("Lax")
                 .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return UserResponse.fromEntity(user);
+    }
+
+    @Override
+    public void logout(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("accessToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     @Override

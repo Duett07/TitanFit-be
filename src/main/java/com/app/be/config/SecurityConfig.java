@@ -63,7 +63,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/orders/*").permitAll()
 
                         // Swagger / OpenAPI documentation
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
+
+                        // Error endpoint
+                        .requestMatchers("/error").permitAll()
 
                         // Admin endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
