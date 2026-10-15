@@ -9,6 +9,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -25,12 +27,20 @@ public class ProductSummaryResponse {
     private String thumbnailUrl;
     private String categoryName;
     private String categorySlug;
+    private List<ProductVariantResponse> variants;
     private LocalDateTime createdAt;
 
     public static ProductSummaryResponse fromEntity(Product product) {
         if (product == null) {
             return null;
         }
+
+        List<ProductVariantResponse> variantResponses = product.getProductVariants() != null
+                ? product.getProductVariants().stream()
+                        .map(ProductVariantResponse::fromEntity)
+                        .toList()
+                : Collections.emptyList();
+
         return ProductSummaryResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -39,6 +49,7 @@ public class ProductSummaryResponse {
                 .thumbnailUrl(product.getThumbnailUrl())
                 .categoryName(product.getCategories() != null ? product.getCategories().getName() : null)
                 .categorySlug(product.getCategories() != null ? product.getCategories().getSlug() : null)
+                .variants(variantResponses)
                 .createdAt(product.getCreatedAt())
                 .build();
     }
