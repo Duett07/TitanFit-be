@@ -31,17 +31,17 @@ public class OrderController {
                 .body(ApiResponse.success("Đặt hàng thành công", response));
     }
 
-    @GetMapping("/{orderCode}")
-    public ResponseEntity<ApiResponse<OrderResponse>> getOrderByCode(@PathVariable String orderCode) {
-        OrderResponse response = orderService.getOrderByCode(orderCode);
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin đơn hàng thành công", response));
-    }
-
     @GetMapping("/my-orders")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         List<OrderResponse> response = orderService.getMyOrders(userDetails);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đơn hàng thành công", response));
+    }
+
+    @GetMapping("/{orderCode}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrderByCode(@PathVariable String orderCode) {
+        OrderResponse response = orderService.getOrderByCode(orderCode);
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin đơn hàng thành công", response));
     }
 }
