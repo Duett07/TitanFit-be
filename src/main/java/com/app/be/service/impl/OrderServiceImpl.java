@@ -125,8 +125,12 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public OrderResponse getOrderByCode(String orderCode) {
-        Order order = orderRepository.findWithDetailsByOrderCode(orderCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+        if (orderCode == null || orderCode.trim().isEmpty()) {
+            throw new BadRequestException("Mã đơn hàng không được để trống");
+        }
+
+        Order order = orderRepository.findWithDetailsByOrderCode(orderCode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim()));
 
         return OrderResponse.fromEntity(order);
     }
@@ -138,7 +142,7 @@ public class OrderServiceImpl implements OrderService {
             throw new UnauthorizedException("Người dùng chưa được xác thực");
         }
 
-        List<Order> orders = orderRepository.findByUser_Id(userDetails.getId());
+        List<Order> orders = orderRepository.findByUser_IdOrderByCreatedAtDesc(userDetails.getId());
         return orders.stream()
                 .map(OrderResponse::fromEntity)
                 .toList();
