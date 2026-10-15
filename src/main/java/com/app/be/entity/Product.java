@@ -15,11 +15,12 @@ import java.util.List;
 @Setter
 public class Product extends BaseEntity {
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Categories categories;
 
     @OneToMany(mappedBy = "product")
+    @org.hibernate.annotations.BatchSize(size = 20)
     private List<ProductVariant> productVariants;
 
     @ManyToOne
