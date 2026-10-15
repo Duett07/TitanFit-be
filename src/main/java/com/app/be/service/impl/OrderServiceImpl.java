@@ -3,6 +3,7 @@ package com.app.be.service.impl;
 import com.app.be.dto.order.CreateOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
+import com.app.be.dto.order.OrderStatus;
 import com.app.be.entity.Order;
 import com.app.be.entity.OrderItem;
 import com.app.be.entity.ProductVariant;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
@@ -146,6 +148,56 @@ public class OrderServiceImpl implements OrderService {
         return orders.stream()
                 .map(OrderResponse::fromEntity)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(UUID orderId, OrderStatus newStatus) {
+        if (newStatus == null) {
+            throw new BadRequestException("Trạng thái mới không được để trống");
+        }
+
+        if (newStatus == OrderStatus.PENDING) {
+            throw new BadRequestException("Không thể chuyển đơn hàng về trạng thái PENDING");
+        }
+
+        Order order = orderRepository.findWithDetailsById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        if (order.getOrderStatus() != null && order.getOrderStatus().equalsIgnoreCase(newStatus.name())) {
+            throw new BadRequestException("Đơn hàng đã ở trạng thái " + newStatus.name() + " rồi");
+        }
+
+        if ("CANCELLED".equalsIgnoreCase(order.getOrderStatus())) {
+            throw new BadRequestException("Đơn hàng đã bị HỦY trước đó, không thể thay đổi trạng thái");
+        }
+
+        if ("COMPLETED".equalsIgnoreCase(order.getOrderStatus())) {
+            throw new BadRequestException("Đơn hàng đã HOÀN THÀNH, không thể thay đổi trạng thái");
+        }
+
+        // Đặc biệt: Nếu newStatus == 'CANCELLED' -> Tự động duyệt qua các OrderItem và cộng hoàn trả lại stock_quantity cho từng ProductVariant!
+        if (newStatus == OrderStatus.CANCELLED) {
+            if (order.getOrderItems() != null) {
+                for (OrderItem item : order.getOrderItems()) {
+                    ProductVariant variant = item.getProductVariant();
+                    if (variant != null) {
+                        int currentStock = variant.getStockQuantity();
+                        int restoredStock = currentStock + item.getQuantity();
+                        variant.setStockQuantity(restoredStock);
+                        productVariantRepository.save(variant);
+                        log.info("Hoàn trả tồn kho cho SKU '{}': {} + {} -> {}",
+                                variant.getSku(), currentStock, item.getQuantity(), restoredStock);
+                    }
+                }
+            }
+        }
+
+        order.setOrderStatus(newStatus.name());
+        Order savedOrder = orderRepository.save(order);
+
+        log.info("Cập nhật đơn hàng {} sang trạng thái {}", savedOrder.getOrderCode(), newStatus.name());
+        return OrderResponse.fromEntity(savedOrder);
     }
 
     /**

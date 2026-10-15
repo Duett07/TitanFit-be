@@ -15,4 +15,6 @@ public interface OrderService {
     OrderResponse getOrderByCode(String orderCode);
 
     List<OrderResponse> getMyOrders(CustomUserDetails userDetails);
+
+    OrderResponse updateOrderStatus(java.util.UUID orderId, com.app.be.dto.order.OrderStatus newStatus);
 }
