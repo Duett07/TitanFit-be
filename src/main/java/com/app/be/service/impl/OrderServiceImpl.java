@@ -4,6 +4,7 @@ import com.app.be.dto.order.CreateOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
+import com.app.be.dto.order.UpdateOrderStatusRequest;
 import com.app.be.entity.Order;
 import com.app.be.entity.OrderItem;
 import com.app.be.entity.ProductVariant;
@@ -207,6 +208,23 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Cập nhật đơn hàng {} sang trạng thái {}", savedOrder.getOrderCode(), newStatus.name());
         return OrderResponse.fromEntity(savedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(UUID orderId, UpdateOrderStatusRequest request, OrderStatus paramStatus) {
+        OrderStatus targetStatus = null;
+        if (request != null && request.getNewStatus() != null) {
+            targetStatus = request.getNewStatus();
+        } else if (paramStatus != null) {
+            targetStatus = paramStatus;
+        }
+
+        if (targetStatus == null) {
+            throw new BadRequestException("Trạng thái mới (newStatus) không được để trống (CONFIRMED, SHIPPING, COMPLETED, CANCELLED)");
+        }
+
+        return updateOrderStatus(orderId, targetStatus);
     }
 
     /**
