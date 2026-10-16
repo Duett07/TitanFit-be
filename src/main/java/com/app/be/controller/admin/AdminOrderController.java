@@ -4,13 +4,13 @@ import com.app.be.dto.ApiResponse;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
-import com.app.be.exception.BadRequestException;
 import com.app.be.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -21,8 +21,8 @@ public class AdminOrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<java.util.List<OrderResponse>>> getAllOrders() {
-        java.util.List<OrderResponse> response = orderService.getAllOrders();
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getAllOrders() {
+        List<OrderResponse> response = orderService.getAllOrders();
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tất cả đơn hàng thành công", response));
     }
 
@@ -32,18 +32,7 @@ public class AdminOrderController {
             @Valid @RequestBody(required = false) UpdateOrderStatusRequest request,
             @RequestParam(name = "newStatus", required = false) OrderStatus paramStatus
     ) {
-        OrderStatus targetStatus = null;
-        if (request != null && request.getNewStatus() != null) {
-            targetStatus = request.getNewStatus();
-        } else if (paramStatus != null) {
-            targetStatus = paramStatus;
-        }
-
-        if (targetStatus == null) {
-            throw new BadRequestException("Trạng thái mới (newStatus) không được để trống (CONFIRMED, SHIPPING, COMPLETED, CANCELLED)");
-        }
-
-        OrderResponse response = orderService.updateOrderStatus(id, targetStatus);
+        OrderResponse response = orderService.updateOrderStatus(id, request, paramStatus);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái đơn hàng thành công", response));
     }
 }
