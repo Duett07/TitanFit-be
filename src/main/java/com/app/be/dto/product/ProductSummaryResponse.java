@@ -28,6 +28,7 @@ public class ProductSummaryResponse {
     private String categoryName;
     private String categorySlug;
     private List<ProductVariantResponse> variants;
+    private boolean isActive;
     private LocalDateTime createdAt;
 
     public static ProductSummaryResponse fromEntity(Product product) {
@@ -50,6 +51,7 @@ public class ProductSummaryResponse {
                 .categoryName(product.getCategories() != null ? product.getCategories().getName() : null)
                 .categorySlug(product.getCategories() != null ? product.getCategories().getSlug() : null)
                 .variants(variantResponses)
+                .isActive(product.isActive())
                 .createdAt(product.getCreatedAt())
                 .build();
     }

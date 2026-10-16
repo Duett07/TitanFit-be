@@ -20,6 +20,12 @@ public class AdminOrderController {
 
     private final OrderService orderService;
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<java.util.List<OrderResponse>>> getAllOrders() {
+        java.util.List<OrderResponse> response = orderService.getAllOrders();
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tất cả đơn hàng thành công", response));
+    }
+
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
             @PathVariable UUID id,
