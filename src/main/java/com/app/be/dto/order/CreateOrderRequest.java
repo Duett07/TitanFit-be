@@ -1,11 +1,11 @@
 package com.app.be.dto.order;
 
+import com.app.be.validation.VnPhone;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,7 +25,7 @@ public class CreateOrderRequest {
     private String customerName;
 
     @NotBlank(message = "Số điện thoại nhận hàng (phone) không được để trống")
-    @Pattern(regexp = "^(0|\\+84)[0-9]{9,10}$", message = "Số điện thoại không đúng định dạng")
+    @VnPhone
     private String phone;
 
     @NotBlank(message = "Địa chỉ nhận hàng (shippingAddress) không được để trống")

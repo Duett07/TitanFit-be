@@ -1,5 +1,6 @@
 package com.app.be.dto.auth;
 
+import com.app.be.validation.VnPhone;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -21,11 +22,12 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank(message = "Mật khẩu không được để trống")
-    @Size(min = 6, message = "Mật khẩu phải có tối thiểu 6 ký tự")
+    @Size(min = 8, max = 72, message = "Mật khẩu phải có độ dài từ 8 đến 72 ký tự")
     private String password;
 
     @NotBlank(message = "Họ và tên không được để trống")
     private String fullName;
 
+    @VnPhone
     private String phone;
 }

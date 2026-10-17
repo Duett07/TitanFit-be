@@ -6,8 +6,10 @@ import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RefreshTokenRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
+import com.app.be.security.ratelimit.RateLimiterService;
 import com.app.be.security.user.CustomUserDetails;
 import com.app.be.service.AuthService;
+import com.app.be.util.ClientIpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -24,9 +26,16 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimiterService rateLimiterService;
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String clientIp = ClientIpUtils.getClientIp(httpRequest);
+        rateLimiterService.checkRegisterRateLimit(clientIp);
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Đăng ký tài khoản thành công", authService.register(request)));
@@ -35,10 +44,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
+        String clientIp = ClientIpUtils.getClientIp(httpRequest);
+        rateLimiterService.checkLoginRateLimit(clientIp, request.getEmail());
+
+        AuthResponse authResponse = authService.login(request, response);
+        rateLimiterService.resetLoginLimit(clientIp, request.getEmail());
+
         return ResponseEntity
-                .ok(ApiResponse.success("Đăng nhập thành công", authService.login(request, response)));
+                .ok(ApiResponse.success("Đăng nhập thành công", authResponse));
     }
 
     @PostMapping("/refresh")
