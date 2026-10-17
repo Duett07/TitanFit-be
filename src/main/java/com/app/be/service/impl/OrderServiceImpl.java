@@ -1,6 +1,7 @@
 package com.app.be.service.impl;
 
 import com.app.be.dto.order.CreateOrderRequest;
+import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
@@ -153,6 +154,41 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return OrderResponse.fromEntity(order);
+    }
+
+    
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse trackOrder(TrackOrderRequest request) {
+        if (request == null || request.getOrderCode() == null || request.getOrderCode().trim().isEmpty()) {
+            throw new BadRequestException("Mã đơn hàng không được để trống");
+        }
+        if (request.getPhone() == null || request.getPhone().trim().isEmpty()) {
+            throw new BadRequestException("Số điện thoại không được để trống");
+        }
+
+        Order order = orderRepository.findWithDetailsByOrderCode(request.getOrderCode().trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng hoặc số điện thoại không trùng khớp"));
+
+        String inputPhone = normalizePhone(request.getPhone());
+        String orderPhone = normalizePhone(order.getPhone());
+
+        if (!inputPhone.equals(orderPhone)) {
+            throw new ResourceNotFoundException("Không tìm thấy đơn hàng hoặc số điện thoại không trùng khớp");
+        }
+
+        return OrderResponse.fromEntity(order);
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) return "";
+        String cleaned = phone.replaceAll("[^0-9+]", "");
+        if (cleaned.startsWith("+84")) {
+            cleaned = "0" + cleaned.substring(3);
+        } else if (cleaned.startsWith("84") && cleaned.length() == 11) {
+            cleaned = "0" + cleaned.substring(2);
+        }
+        return cleaned;
     }
 
     @Override

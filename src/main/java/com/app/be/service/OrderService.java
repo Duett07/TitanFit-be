@@ -1,6 +1,7 @@
 package com.app.be.service;
 
 import com.app.be.dto.order.CreateOrderRequest;
+import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
@@ -18,6 +19,9 @@ public interface OrderService {
     OrderResponse getOrderByCode(String orderCode, CustomUserDetails userDetails);
 
     OrderResponse getOrderByCode(String orderCode);
+
+    OrderResponse trackOrder(TrackOrderRequest request);
+
 
     List<OrderResponse> getMyOrders(CustomUserDetails userDetails);
 

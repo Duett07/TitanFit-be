@@ -50,6 +50,10 @@ public class SecurityConfig {
                 // Endpoint authorization rules (Strict order: Specific rules first)
                 .authorizeHttpRequests(auth -> auth
                         // Customer endpoints - All order endpoints require authentication
+                        // Public order tracking by orderCode & verified phone
+                        .requestMatchers(HttpMethod.POST, "/api/orders/track").permitAll()
+
+                        // Customer endpoints - All other order endpoints require authentication
                         .requestMatchers("/api/orders", "/api/orders/**").authenticated()
 
                         // Auth me endpoint (requires authentication)
