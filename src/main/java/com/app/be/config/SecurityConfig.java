@@ -36,6 +36,9 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private List<String> allowedOrigins;
 
+    @Value("${springdoc.api-docs.enabled:false}")
+    private boolean swaggerEnabled;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -68,7 +71,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
 
-                        // Swagger / OpenAPI documentation
+                        // Swagger / OpenAPI documentation (Công khai ở dev; yêu cầu ROLE_ADMIN khi tắt/production)
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
@@ -77,7 +80,16 @@ public class SecurityConfig {
                                 "/swagger-ui",
                                 "/swagger-resources/**",
                                 "/webjars/**"
-                        ).permitAll()
+                        ).access((authentication, context) -> {
+                            if (swaggerEnabled) {
+                                return new org.springframework.security.authorization.AuthorizationDecision(true);
+                            }
+                            // Khi tắt công khai, chỉ cho phép quản trị viên truy cập
+                            return new org.springframework.security.authorization.AuthorizationDecision(
+                                    authentication.get() != null && authentication.get().getAuthorities().stream()
+                                            .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))
+                            );
+                        })
 
                         // Error endpoint
                         .requestMatchers("/error").permitAll()
