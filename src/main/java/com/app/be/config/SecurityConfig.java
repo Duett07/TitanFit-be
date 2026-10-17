@@ -35,7 +35,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Disable CSRF for stateless REST API
+                // Disable CSRF for stateless REST API (Protected endpoints authenticate strictly via Bearer header, eliminating CSRF risk)
                 .csrf(AbstractHttpConfigurer::disable)
 
                 // Enable CORS with custom configuration

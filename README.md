@@ -69,10 +69,12 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# JWT Security (Tạo bằng lệnh: openssl rand -base64 32)
+# JWT & Cookie Security (Tạo bằng lệnh: openssl rand -base64 32)
 JWT_SECRET=Thay_bằng_chuỗi_base64_32_bytes_của_bạn
 ACCESS_TOKEN_EXP=1800
 REFRESH_TOKEN_EXP=604800
+COOKIE_SECURE=false
+COOKIE_SAME_SITE=Lax
 
 # Initial Admin Account (Bắt buộc mật khẩu mạnh >= 8 ký tự khi chạy production)
 INIT_ADMIN_EMAIL=admin@titanfit.vn
@@ -86,6 +88,8 @@ INIT_BUYER_PHONE=0912345678
 ```
 
 > **Lưu ý bảo mật & Môi trường:**
+> - **Cơ chế Token & Phòng chống CSRF**: API được bảo vệ nghiêm ngặt bằng Header `Authorization: Bearer <access_token>`. Cookie HttpOnly chỉ dùng lưu trữ và cấp lại Refresh Token trên endpoint `/api/auth`. Cơ chế này loại bỏ hoàn toàn nguy cơ tấn công CSRF.
+> - **Cookie Security (`COOKIE_SECURE`)**: Đặt `false` trong môi trường phát triển HTTP và bắt buộc `true` trên Production có HTTPS để cấm truyền cookie qua kết nối không mã hóa.
 > - **Cơ chế Token**: `ACCESS_TOKEN_EXP=1800` (Access Token tồn tại 30 phút), `REFRESH_TOKEN_EXP=604800` (Refresh Token tồn tại 7 ngày). Khi logout, Access Token được đưa vào Redis blacklist và Refresh Token bị thu hồi ngay lập tức.
 > - **Cơ chế Refresh Token Rotation**: Gọi `POST /api/auth/refresh` để cấp cặp token mới an toàn, token cũ tự hủy.
 > - Khóa `JWT_SECRET` bắt buộc phải là chuỗi Base64 với độ dài sau giải mã tối thiểu 32 bytes (256 bits).

@@ -73,19 +73,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Chỉ chấp nhận Access Token qua Authorization: Bearer <token> Header.
+     * Không đọc Access Token từ Cookie để loại trừ hoàn toàn nguy cơ tấn công CSRF (Cross-Site Request Forgery)
+     * khi gọi các API được bảo vệ.
+     */
     private String parseJwt(HttpServletRequest request) {
         String headerAuth = request.getHeader("Authorization");
 
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
-        }
-
-        if (request.getCookies() != null) {
-            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
-                if ("accessToken".equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
-                    return cookie.getValue();
-                }
-            }
         }
 
         return null;

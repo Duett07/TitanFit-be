@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -40,6 +41,20 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtils jwtUtils;
     private final AuthenticationManager authenticationManager;
     private final TokenRedisService tokenRedisService;
+
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
+
+    @Value("${app.cookie.same-site:Lax}")
+    private String cookieSameSite = "Lax";
+
+    void setCookieSecure(boolean cookieSecure) {
+        this.cookieSecure = cookieSecure;
+    }
+
+    void setCookieSameSite(String cookieSameSite) {
+        this.cookieSameSite = cookieSameSite;
+    }
 
     @Override
     @Transactional
@@ -188,18 +203,18 @@ public class AuthServiceImpl implements AuthService {
     private void addTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(jwtUtils.getAccessTokenExpirationSeconds())
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
 
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false)
-                .path("/")
+                .secure(cookieSecure)
+                .path("/api/auth")
                 .maxAge(jwtUtils.getRefreshTokenExpirationSeconds())
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
@@ -209,22 +224,32 @@ public class AuthServiceImpl implements AuthService {
     private void clearTokenCookies(HttpServletResponse response) {
         ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
 
-        ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
+        // Xoá refreshToken trên cả đường dẫn giới hạn (/api/auth) và đường dẫn gốc (/)
+        ResponseCookie clearRefreshApi = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
+                .path("/api/auth")
+                .maxAge(0)
+                .sameSite(cookieSameSite)
+                .build();
+
+        ResponseCookie clearRefreshRoot = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, clearAccess.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, clearRefresh.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, clearRefreshApi.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, clearRefreshRoot.toString());
     }
 
     private String parseToken(HttpServletRequest request) {
