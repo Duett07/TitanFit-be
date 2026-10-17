@@ -55,6 +55,10 @@ cp .env.example .env
 Mở file `.env` và cập nhật thông tin tài khoản MySQL của máy bạn:
 
 ```env
+# Application Profile & Seed
+SPRING_PROFILES_ACTIVE=dev
+APP_SEED_ENABLED=true
+
 # Database Configuration
 MYSQL_HOST=localhost
 DB_USERNAME=root
@@ -66,18 +70,24 @@ JWT_EXPIRATION=2592000000
 ACCESS_TOKEN_EXP=1800
 REFRESH_TOKEN_EXP=604800
 
-# Default Seed Accounts
+# Initial Admin Account (Bắt buộc mật khẩu mạnh >= 8 ký tự khi chạy production)
 INIT_ADMIN_EMAIL=admin@titanfit.vn
-INIT_ADMIN_PASSWORD=admin123
+INIT_ADMIN_PASSWORD=Mật_khẩu_admin_bảo_mật_cao
+INIT_ADMIN_PHONE=0900000001
+
+# Demo Buyer Account (Chỉ hoạt động ở profile dev và khi APP_SEED_ENABLED=true)
 INIT_BUYER_EMAIL=hoang.nguyen@example.com
 INIT_BUYER_PASSWORD=123456
+INIT_BUYER_PHONE=0912345678
 ```
 
-> **Lưu ý bảo mật:**
+> **Lưu ý bảo mật & Môi trường:**
 > - Khóa `JWT_SECRET` bắt buộc phải là chuỗi Base64 với độ dài sau giải mã tối thiểu 32 bytes (256 bits).
-> - Sinh khóa nhanh trên Linux/macOS/Git Bash bằng lệnh: `openssl rand -base64 32`
-> - Hoặc trên Windows PowerShell: `[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))`
-> - Spring Boot đã cấu hình tự động import biến từ file `.env` qua `spring.config.import=optional:file:.env[.properties]`.
+>   - Sinh khóa trên Linux/macOS/Git Bash: `openssl rand -base64 32`
+>   - Trên Windows PowerShell: `[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))`
+> - `APP_SEED_ENABLED`: Khi `true` (mặc định ở profile `dev`), hệ thống sẽ nạp danh mục, sản phẩm mẫu và tài khoản buyer demo. Ở production, seeder dữ liệu mẫu tự động bị vô hiệu hóa (`false`).
+> - `INIT_ADMIN_PASSWORD`: Ở production (`SPRING_PROFILES_ACTIVE=prod`), hệ thống sẽ **từ chối khởi động (fail-fast)** nếu mật khẩu admin bị thiếu, ngắn hơn 8 ký tự hoặc chứa các từ khóa yếu mặc định (`admin123`, `123456`, `password`, `CHANGE_ME`).
+> - Spring Boot tự động nạp biến từ file `.env` qua cấu hình `spring.config.import`.
 
 ---
 
