@@ -5,8 +5,10 @@ import com.app.be.dto.common.PageResponse;
 import com.app.be.dto.product.ProductDetailResponse;
 import com.app.be.dto.product.ProductSummaryResponse;
 import com.app.be.service.ProductService;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -14,6 +16,7 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
+@Validated
 public class ProductController {
 
     private final ProductService productService;
@@ -22,7 +25,7 @@ public class ProductController {
     public ResponseEntity<ApiResponse<PageResponse<ProductSummaryResponse>>> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
-            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) @Size(max = 100, message = "Từ khóa tìm kiếm tối đa 100 ký tự") String keyword,
             @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,

@@ -11,6 +11,9 @@ import java.util.List;
 
 public class ProductSpecification {
 
+    public static final char ESCAPE_CHAR = '\\';
+    public static final int MAX_KEYWORD_LENGTH = 100;
+
     public static Specification<Product> filterProducts(
             String keyword,
             String categorySlug,
@@ -23,10 +26,13 @@ public class ProductSpecification {
             // Always filter only active products on the public store
             predicates.add(cb.isTrue(root.get("isActive")));
 
-            // Filter by keyword in product name
+            // Filter by keyword in product name with LIKE wildcards escaped
             if (StringUtils.hasText(keyword)) {
-                String pattern = "%" + keyword.trim().toLowerCase() + "%";
-                predicates.add(cb.like(cb.lower(root.get("name")), pattern));
+                String escapedKeyword = escapeLikePattern(keyword);
+                if (StringUtils.hasText(escapedKeyword)) {
+                    String pattern = "%" + escapedKeyword.toLowerCase() + "%";
+                    predicates.add(cb.like(cb.lower(root.get("name")), pattern, ESCAPE_CHAR));
+                }
             }
 
             // Filter by category slug
@@ -46,5 +52,29 @@ public class ProductSpecification {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    /**
+     * Escapes special wildcard characters for SQL LIKE query ('\', '%', '_')
+     * and trims / limits length to MAX_KEYWORD_LENGTH characters to prevent
+     * expensive full scans and wildcard denial of service.
+     */
+    public static String escapeLikePattern(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        String clean = value.trim();
+        if (clean.length() > MAX_KEYWORD_LENGTH) {
+            clean = clean.substring(0, MAX_KEYWORD_LENGTH);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < clean.length(); i++) {
+            char c = clean.charAt(i);
+            if (c == ESCAPE_CHAR || c == '%' || c == '_') {
+                sb.append(ESCAPE_CHAR);
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 }
