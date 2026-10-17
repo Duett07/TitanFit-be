@@ -1,5 +1,6 @@
 package com.app.be.config;
 
+import com.app.be.security.jwt.JwtAccessDeniedHandler;
 import com.app.be.security.jwt.JwtAuthenticationEntryPoint;
 import com.app.be.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint unauthorizedHandler;
+    private final JwtAccessDeniedHandler accessDeniedHandler;
 
     @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private List<String> allowedOrigins;
@@ -51,8 +53,11 @@ public class SecurityConfig {
                 // Stateless session management
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Custom 401 Unauthorized entry point
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
+                // Custom 401 Unauthorized entry point & 403 Access Denied handler
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(unauthorizedHandler)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
 
                 // Endpoint authorization rules (Strict order: Specific rules first)
                 .authorizeHttpRequests(auth -> auth

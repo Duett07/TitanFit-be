@@ -192,25 +192,37 @@ public class JwtUtils {
     }
 
     /**
+     * Parse and cryptographically validate JWT token in a single pass.
+     * Returns the Claims payload if valid, or null if expired/invalid.
+     * Logs expired tokens at DEBUG level to avoid log pollution, and invalid signatures at WARN.
+     */
+    public Claims parseAndValidateClaims(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token.trim())
+                    .getPayload();
+        } catch (ExpiredJwtException e) {
+            log.debug("JWT token is expired: {}", e.getMessage());
+        } catch (SecurityException | MalformedJwtException e) {
+            log.warn("Invalid JWT signature or format: {}", e.getMessage());
+        } catch (UnsupportedJwtException e) {
+            log.warn("JWT token is unsupported: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.debug("JWT claims string is empty: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
      * Validate JWT token structure, signature, and expiration.
      */
     public boolean validateToken(String token) {
-        try {
-            Jwts.parser()
-                    .verifyWith(getSigningKey())
-                    .build()
-                    .parseSignedClaims(token);
-            return true;
-        } catch (SecurityException | MalformedJwtException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
-        } catch (ExpiredJwtException e) {
-            log.error("JWT token is expired: {}", e.getMessage());
-        } catch (UnsupportedJwtException e) {
-            log.error("JWT token is unsupported: {}", e.getMessage());
-        } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e.getMessage());
-        }
-        return false;
+        return parseAndValidateClaims(token) != null;
     }
 
     /**
