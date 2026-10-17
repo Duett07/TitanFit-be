@@ -40,8 +40,11 @@ public class OrderController {
     }
 
     @GetMapping("/{orderCode}")
-    public ResponseEntity<ApiResponse<OrderResponse>> getOrderByCode(@PathVariable String orderCode) {
-        OrderResponse response = orderService.getOrderByCode(orderCode);
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrderByCode(
+            @PathVariable String orderCode,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        OrderResponse response = orderService.getOrderByCode(orderCode, userDetails);
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin đơn hàng thành công", response));
     }
 }

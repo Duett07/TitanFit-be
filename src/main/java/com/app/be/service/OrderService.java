@@ -15,6 +15,8 @@ public interface OrderService {
 
     OrderResponse createOrder(CreateOrderRequest request);
 
+    OrderResponse getOrderByCode(String orderCode, CustomUserDetails userDetails);
+
     OrderResponse getOrderByCode(String orderCode);
 
     List<OrderResponse> getMyOrders(CustomUserDetails userDetails);

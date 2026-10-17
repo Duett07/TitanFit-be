@@ -49,9 +49,8 @@ public class SecurityConfig {
 
                 // Endpoint authorization rules (Strict order: Specific rules first)
                 .authorizeHttpRequests(auth -> auth
-                        // Customer endpoints (Must come before /api/orders/*)
-                        .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/orders/my-orders").authenticated()
+                        // Customer endpoints - All order endpoints require authentication
+                        .requestMatchers("/api/orders", "/api/orders/**").authenticated()
 
                         // Auth me endpoint (requires authentication)
                         .requestMatchers("/api/auth/me").authenticated()
@@ -60,7 +59,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/orders/*").permitAll()
 
                         // Swagger / OpenAPI documentation
                         .requestMatchers(
