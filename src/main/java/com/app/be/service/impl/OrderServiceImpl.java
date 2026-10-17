@@ -28,12 +28,16 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
+import java.security.SecureRandom;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String ORDER_CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static final int ORDER_CODE_LENGTH = 8;
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -123,6 +127,32 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
         return createOrder(request, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderByCode(String orderCode, CustomUserDetails userDetails) {
+        if (userDetails == null || userDetails.getId() == null) {
+            throw new UnauthorizedException("Người dùng chưa được xác thực");
+        }
+
+        if (orderCode == null || orderCode.trim().isEmpty()) {
+            throw new BadRequestException("Mã đơn hàng không được để trống");
+        }
+
+        Order order = orderRepository.findWithDetailsByOrderCode(orderCode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim()));
+
+        boolean isAdmin = userDetails.getAuthorities() != null && userDetails.getAuthorities().stream()
+                .anyMatch(auth -> "ROLE_ADMIN".equalsIgnoreCase(auth.getAuthority()));
+
+        boolean isOwner = order.getUser() != null && userDetails.getId().equals(order.getUser().getId());
+
+        if (!isAdmin && !isOwner) {
+            throw new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim());
+        }
+
+        return OrderResponse.fromEntity(order);
     }
 
     @Override
@@ -228,13 +258,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * Sinh mã đơn hàng duy nhất có định dạng TF- + 6 chữ số ngẫu nhiên (ví dụ: TF-883921)
+     * Sinh mã đơn hàng duy nhất có độ hỗn loạn cao bằng SecureRandom
+     * Định dạng: TF- + 8 ký tự alphanumeric Base32 (ví dụ: TF-7K9M2PX4)
+     * Không gian mẫu: 32^8 ~ 1.1 x 10^12 khả năng, loại bỏ nguy cơ dò quét hàng loạt.
      */
     private String generateUniqueOrderCode() {
         String orderCode;
         do {
-            int randomNum = ThreadLocalRandom.current().nextInt(100000, 1000000);
-            orderCode = "TF-" + randomNum;
+            StringBuilder sb = new StringBuilder("TF-");
+            for (int i = 0; i < ORDER_CODE_LENGTH; i++) {
+                int index = SECURE_RANDOM.nextInt(ORDER_CODE_CHARS.length());
+                sb.append(ORDER_CODE_CHARS.charAt(index));
+            }
+            orderCode = sb.toString();
         } while (orderRepository.existsByOrderCode(orderCode));
         return orderCode;
     }
