@@ -155,10 +155,12 @@ Khi khởi động server lần đầu tiên, hệ thống sẽ tự động th�
 
 ## 📖 Tài Liệu API & Swagger UI
 
-Sau khi server khởi động, bạn có thể tương tác và thử nghiệm toàn bộ API trực tiếp qua giao diện Swagger UI:
+Sau khi server khởi động (ở môi trường Development), bạn có thể tương tác và thử nghiệm toàn bộ API trực tiếp qua giao diện Swagger UI:
 
 - **Swagger UI Interactive:** [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 - **OpenAPI Schema (JSON):** [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+
+> 🔒 **Lưu ý bảo mật:** Swagger/OpenAPI được bật mặc định ở môi trường `dev`. Trên môi trường `prod`, Swagger tự động bị tắt nhằm chống rò rỉ cấu trúc hệ thống (`springdoc.api-docs.enabled=false`) và được bảo vệ nhiều tầng (yêu cầu quyền `ROLE_ADMIN` nếu được kích hoạt qua biến môi trường `SPRINGDOC_ENABLED=true`).
 
 ---
 
