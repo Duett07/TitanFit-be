@@ -1,6 +1,7 @@
 package com.app.be.security.jwt;
 
 import com.app.be.security.user.CustomUserDetailsService;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,39 +36,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            if (jwt != null && jwtUtils.validateToken(jwt)) {
-                // Kiểm tra token có nằm trong blacklist (do logout) không
-                if (tokenRedisService.isBlacklisted(jwt)) {
-                    log.warn("Rejected blacklisted JWT token");
-                    filterChain.doFilter(request, response);
-                    return;
-                }
+            if (jwt != null) {
+                // Parse và xác thực chữ ký token 1 lần duy nhất để tối ưu hiệu năng
+                Claims claims = jwtUtils.parseAndValidateClaims(jwt);
+                if (claims != null) {
+                    // 1. Kiểm tra token có nằm trong blacklist (do logout) không
+                    if (tokenRedisService.isBlacklisted(jwt)) {
+                        log.warn("Rejected blacklisted JWT token on [{}]", request.getServletPath());
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
 
-                // Đảm bảo đây là Access Token, không được dùng Refresh Token để gọi API
-                if (!jwtUtils.isAccessToken(jwt)) {
-                    log.warn("Rejected non-access JWT token on protected endpoint");
-                    filterChain.doFilter(request, response);
-                    return;
-                }
+                    // 2. Đảm bảo đây là Access Token, không được dùng Refresh Token để gọi API
+                    String tokenType = claims.get("type", String.class);
+                    if (tokenType != null && !"ACCESS".equalsIgnoreCase(tokenType)) {
+                        log.warn("Rejected non-access JWT token type [{}] on protected endpoint [{}]", tokenType, request.getServletPath());
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
 
-                String email = jwtUtils.extractEmail(jwt);
+                    // 3. Trích xuất email từ subject của claims đã parse
+                    String email = claims.getSubject();
 
-                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                    if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails,
+                                        null,
+                                        userDetails.getAuthorities()
+                                );
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
                 }
             }
         } catch (Exception e) {
-            log.error("Cannot set user authentication: {}", e.getMessage());
+            log.warn("Could not set user authentication in security context: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
