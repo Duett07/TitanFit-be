@@ -5,15 +5,19 @@ import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
 import com.app.be.entity.User;
+import com.app.be.exception.BadRequestException;
 import com.app.be.exception.DuplicateResourceException;
 import com.app.be.exception.ResourceNotFoundException;
 import com.app.be.exception.UnauthorizedException;
 import com.app.be.repository.UserRepository;
 import com.app.be.security.jwt.JwtUtils;
+import com.app.be.security.jwt.TokenRedisService;
 import com.app.be.security.user.CustomUserDetails;
 import com.app.be.service.AuthService;
-import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,6 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Date;
+import java.util.UUID;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -31,6 +39,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final AuthenticationManager authenticationManager;
+    private final TokenRedisService tokenRedisService;
 
     @Override
     @Transactional
@@ -59,7 +68,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public UserResponse login(LoginRequest request, HttpServletResponse response) {
+    public AuthResponse login(LoginRequest request, HttpServletResponse response) {
         String email = request.getEmail().trim().toLowerCase();
 
         authenticationManager.authenticate(
@@ -69,32 +78,98 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
-        String token = jwtUtils.generateToken(user);
+        String accessToken = jwtUtils.generateAccessToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
 
-        ResponseCookie cookie = ResponseCookie.from("accessToken", token)
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(jwtUtils.getJwtExpiration() / 1000)
-                .sameSite("Lax")
-                .build();
+        tokenRedisService.saveRefreshToken(user.getId(), refreshToken, jwtUtils.getRefreshTokenExpirationSeconds());
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        addTokenCookies(response, accessToken, refreshToken);
 
-        return UserResponse.fromEntity(user);
+        log.info("User logged in successfully: {} (access token: {}s, refresh token: {}s)",
+                email, jwtUtils.getAccessTokenExpirationSeconds(), jwtUtils.getRefreshTokenExpirationSeconds());
+
+        return AuthResponse.of(user, accessToken, refreshToken, jwtUtils.getAccessTokenExpirationSeconds());
+    }
+
+    @Override
+    public AuthResponse refreshToken(String refreshToken, HttpServletRequest request, HttpServletResponse response) {
+        String tokenToVerify = refreshToken;
+        if (!StringUtils.hasText(tokenToVerify) && request != null && request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("refreshToken".equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
+                    tokenToVerify = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        if (!StringUtils.hasText(tokenToVerify)) {
+            throw new BadRequestException("Refresh token không được để trống");
+        }
+
+        if (!jwtUtils.validateToken(tokenToVerify) || !jwtUtils.isRefreshToken(tokenToVerify)) {
+            throw new UnauthorizedException("Refresh token không hợp lệ hoặc đã hết hạn");
+        }
+
+        String userIdStr = jwtUtils.extractUserId(tokenToVerify);
+        if (userIdStr == null) {
+            throw new UnauthorizedException("Refresh token không chứa thông tin người dùng hợp lệ");
+        }
+
+        UUID userId;
+        try {
+            userId = UUID.fromString(userIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new UnauthorizedException("Định dạng User ID trong token không hợp lệ");
+        }
+
+        if (!tokenRedisService.validateRefreshToken(userId, tokenToVerify)) {
+            throw new UnauthorizedException("Refresh token đã bị thu hồi hoặc đã được sử dụng. Vui lòng đăng nhập lại.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        // Refresh Token Rotation: Cấp cặp token mới và lưu Refresh token mới vào Redis
+        String newAccessToken = jwtUtils.generateAccessToken(user);
+        String newRefreshToken = jwtUtils.generateRefreshToken(user);
+
+        tokenRedisService.saveRefreshToken(user.getId(), newRefreshToken, jwtUtils.getRefreshTokenExpirationSeconds());
+
+        addTokenCookies(response, newAccessToken, newRefreshToken);
+
+        log.info("Refreshed tokens successfully for user: {}", user.getEmail());
+
+        return AuthResponse.of(user, newAccessToken, newRefreshToken, jwtUtils.getAccessTokenExpirationSeconds());
+    }
+
+    @Override
+    public void logout(HttpServletRequest request, HttpServletResponse response) {
+        if (request != null) {
+            String token = parseToken(request);
+            if (StringUtils.hasText(token) && jwtUtils.validateToken(token)) {
+                try {
+                    Date expiration = jwtUtils.extractExpiration(token);
+                    long remainingSeconds = (expiration.getTime() - System.currentTimeMillis()) / 1000;
+                    if (remainingSeconds > 0) {
+                        tokenRedisService.blacklistAccessToken(token, remainingSeconds);
+                    }
+                    String userIdStr = jwtUtils.extractUserId(token);
+                    if (userIdStr != null) {
+                        tokenRedisService.deleteRefreshToken(UUID.fromString(userIdStr));
+                    }
+                } catch (Exception e) {
+                    log.warn("Error invalidating token during logout: {}", e.getMessage());
+                }
+            }
+        }
+        clearTokenCookies(response);
+        log.info("User logged out and tokens invalidated");
     }
 
     @Override
     public void logout(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from("accessToken", "")
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(0)
-                .sameSite("Lax")
-                .build();
-
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        logout(null, response);
     }
 
     @Override
@@ -108,5 +183,62 @@ public class AuthServiceImpl implements AuthService {
                 .orElse(userDetails.getUser());
 
         return UserResponse.fromEntity(user);
+    }
+
+    private void addTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
+        ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(jwtUtils.getAccessTokenExpirationSeconds())
+                .sameSite("Lax")
+                .build();
+
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(jwtUtils.getRefreshTokenExpirationSeconds())
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+    }
+
+    private void clearTokenCookies(HttpServletResponse response) {
+        ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+
+        ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, clearAccess.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, clearRefresh.toString());
+    }
+
+    private String parseToken(HttpServletRequest request) {
+        String headerAuth = request.getHeader("Authorization");
+        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
+            return headerAuth.substring(7);
+        }
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 }

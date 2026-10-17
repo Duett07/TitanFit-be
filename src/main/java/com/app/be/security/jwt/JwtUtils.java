@@ -18,6 +18,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Slf4j
@@ -29,18 +30,30 @@ public class JwtUtils {
 
     private SecretKey signingKey;
 
-    // Default: 30 days in milliseconds (30 * 24 * 60 * 60 * 1000)
-    @Value("${jwt.expiration:2592000000}")
-    private long jwtExpiration;
+    // Default: 30 minutes in seconds (1800s)
+    @Value("${jwt.access-token-expiration:1800}")
+    private long accessTokenExpirationSeconds;
+
+    // Default: 7 days in seconds (604800s)
+    @Value("${jwt.refresh-token-expiration:604800}")
+    private long refreshTokenExpirationSeconds;
+
+    public long getAccessTokenExpirationSeconds() {
+        return accessTokenExpirationSeconds;
+    }
+
+    public long getRefreshTokenExpirationSeconds() {
+        return refreshTokenExpirationSeconds;
+    }
 
     public long getJwtExpiration() {
-        return jwtExpiration;
+        return accessTokenExpirationSeconds * 1000;
     }
 
     /**
-     * Generate standard 30-day token for User entity.
+     * Generate short-lived Access Token (15-30 minutes).
      */
-    public String generateToken(User user) {
+    public String generateAccessToken(User user) {
         Map<String, Object> extraClaims = new HashMap<>();
         if (user.getId() != null) {
             extraClaims.put("userId", user.getId().toString());
@@ -51,7 +64,57 @@ public class JwtUtils {
         if (user.getFullName() != null) {
             extraClaims.put("fullName", user.getFullName());
         }
-        return generateToken(extraClaims, user.getEmail(), jwtExpiration);
+        extraClaims.put("tokenType", "ACCESS");
+        extraClaims.put("jti", UUID.randomUUID().toString());
+
+        return generateToken(extraClaims, user.getEmail(), accessTokenExpirationSeconds * 1000);
+    }
+
+    /**
+     * Generate long-lived Refresh Token (7 days).
+     */
+    public String generateRefreshToken(User user) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        if (user.getId() != null) {
+            extraClaims.put("userId", user.getId().toString());
+        }
+        extraClaims.put("tokenType", "REFRESH");
+        extraClaims.put("jti", UUID.randomUUID().toString());
+
+        return generateToken(extraClaims, user.getEmail(), refreshTokenExpirationSeconds * 1000);
+    }
+
+    /**
+     * Standard token generation delegating to generateAccessToken.
+     */
+    public String generateToken(User user) {
+        return generateAccessToken(user);
+    }
+
+    /**
+     * Extract token type (ACCESS or REFRESH).
+     */
+    public String extractTokenType(String token) {
+        try {
+            return extractClaim(token, claims -> claims.get("tokenType", String.class));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if token is a refresh token.
+     */
+    public boolean isRefreshToken(String token) {
+        return "REFRESH".equalsIgnoreCase(extractTokenType(token));
+    }
+
+    /**
+     * Check if token is an access token (or legacy token without explicit type).
+     */
+    public boolean isAccessToken(String token) {
+        String type = extractTokenType(token);
+        return type == null || "ACCESS".equalsIgnoreCase(type);
     }
 
     /**

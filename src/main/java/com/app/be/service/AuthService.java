@@ -1,18 +1,24 @@
 package com.app.be.service;
 
+import com.app.be.dto.auth.AuthResponse;
 import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
 import com.app.be.security.user.CustomUserDetails;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 public interface AuthService {
 
     UserResponse register(RegisterRequest request);
 
-    UserResponse login(LoginRequest request, HttpServletResponse response);
+    AuthResponse login(LoginRequest request, HttpServletResponse response);
+
+    AuthResponse refreshToken(String refreshToken, HttpServletRequest request, HttpServletResponse response);
 
     UserResponse getCurrentUser(CustomUserDetails userDetails);
+
+    void logout(HttpServletRequest request, HttpServletResponse response);
 
     void logout(HttpServletResponse response);
 }

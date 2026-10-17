@@ -25,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final CustomUserDetailsService userDetailsService;
+    private final TokenRedisService tokenRedisService;
 
     @Override
     protected void doFilterInternal(
@@ -35,6 +36,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = parseJwt(request);
             if (jwt != null && jwtUtils.validateToken(jwt)) {
+                // Kiểm tra token có nằm trong blacklist (do logout) không
+                if (tokenRedisService.isBlacklisted(jwt)) {
+                    log.warn("Rejected blacklisted JWT token");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // Đảm bảo đây là Access Token, không được dùng Refresh Token để gọi API
+                if (!jwtUtils.isAccessToken(jwt)) {
+                    log.warn("Rejected non-access JWT token on protected endpoint");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 String email = jwtUtils.extractEmail(jwt);
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {

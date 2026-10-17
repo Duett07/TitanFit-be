@@ -64,9 +64,13 @@ MYSQL_HOST=localhost
 DB_USERNAME=root
 DB_PASSWORD=Mật_khẩu_mysql_của_bạn
 
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
 # JWT Security (Tạo bằng lệnh: openssl rand -base64 32)
 JWT_SECRET=Thay_bằng_chuỗi_base64_32_bytes_của_bạn
-JWT_EXPIRATION=2592000000
 ACCESS_TOKEN_EXP=1800
 REFRESH_TOKEN_EXP=604800
 
@@ -82,6 +86,8 @@ INIT_BUYER_PHONE=0912345678
 ```
 
 > **Lưu ý bảo mật & Môi trường:**
+> - **Cơ chế Token**: `ACCESS_TOKEN_EXP=1800` (Access Token tồn tại 30 phút), `REFRESH_TOKEN_EXP=604800` (Refresh Token tồn tại 7 ngày). Khi logout, Access Token được đưa vào Redis blacklist và Refresh Token bị thu hồi ngay lập tức.
+> - **Cơ chế Refresh Token Rotation**: Gọi `POST /api/auth/refresh` để cấp cặp token mới an toàn, token cũ tự hủy.
 > - Khóa `JWT_SECRET` bắt buộc phải là chuỗi Base64 với độ dài sau giải mã tối thiểu 32 bytes (256 bits).
 >   - Sinh khóa trên Linux/macOS/Git Bash: `openssl rand -base64 32`
 >   - Trên Windows PowerShell: `[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))`
