@@ -205,8 +205,10 @@ Sau khi server khởi động, bạn có thể tương tác và thử nghiệm t
 
 ## 🌐 Cấu Hình CORS & Tích Hợp Frontend
 
-Hệ thống backend đã được thiết lập CORS sẵn sàng tích hợp với ứng dụng Frontend (Next.js/React) tại:
-- `http://localhost:3000` (Hỗ trợ đầy đủ `credentials`, header `Authorization` và các phương thức `GET, POST, PUT, DELETE, PATCH, OPTIONS`).
+Hệ thống backend hỗ trợ cấu hình danh sách Frontend Origin động thông qua biến môi trường `CORS_ALLOWED_ORIGINS` (hoặc cấu hình `app.cors.allowed-origins` trong properties):
+- **Môi trường Development:** Mặc định cho phép `http://localhost:3000`, `http://localhost:5173`, `http://127.0.0.1:3000`, `http://127.0.0.1:5173`.
+- **Môi trường Production:** Đọc danh sách origin được chỉ định qua biến `CORS_ALLOWED_ORIGINS` (ví dụ: `https://titanfit.vn,https://admin.titanfit.vn`).
+- Hỗ trợ đầy đủ `credentials` (cookie & auth header), thu hẹp headers an toàn (`Authorization`, `Content-Type`, `Accept`, `Origin`, `X-Requested-With`, `Access-Control-Request-*`), expose `Retry-After` (phục vụ Rate Limiting), và tự động cache preflight request 1 giờ.
 
 ---
 
