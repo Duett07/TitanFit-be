@@ -60,8 +60,8 @@ MYSQL_HOST=localhost
 DB_USERNAME=root
 DB_PASSWORD=Mật_khẩu_mysql_của_bạn
 
-# JWT Security
-JWT_SECRET=h5GJBuBwDmkM9+1XsTGOBJbMQUBygZZ41Zg8qdoHSpY=
+# JWT Security (Tạo bằng lệnh: openssl rand -base64 32)
+JWT_SECRET=Thay_bằng_chuỗi_base64_32_bytes_của_bạn
 JWT_EXPIRATION=2592000000
 ACCESS_TOKEN_EXP=1800
 REFRESH_TOKEN_EXP=604800
@@ -73,7 +73,11 @@ INIT_BUYER_EMAIL=hoang.nguyen@example.com
 INIT_BUYER_PASSWORD=123456
 ```
 
-> **Lưu ý:** Spring Boot đã cấu hình tự động import biến từ file `.env` qua `spring.config.import=optional:file:.env[.properties]`.
+> **Lưu ý bảo mật:**
+> - Khóa `JWT_SECRET` bắt buộc phải là chuỗi Base64 với độ dài sau giải mã tối thiểu 32 bytes (256 bits).
+> - Sinh khóa nhanh trên Linux/macOS/Git Bash bằng lệnh: `openssl rand -base64 32`
+> - Hoặc trên Windows PowerShell: `[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Max 256 }))`
+> - Spring Boot đã cấu hình tự động import biến từ file `.env` qua `spring.config.import=optional:file:.env[.properties]`.
 
 ---
 

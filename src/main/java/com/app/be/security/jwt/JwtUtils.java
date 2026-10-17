@@ -9,12 +9,12 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,8 +24,10 @@ import java.util.function.Function;
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret:defaultSecretKeyForTestingTitanFitApplication20261014!}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
+
+    private SecretKey signingKey;
 
     // Default: 30 days in milliseconds (30 * 24 * 60 * 60 * 1000)
     @Value("${jwt.expiration:2592000000}")
@@ -149,15 +151,42 @@ public class JwtUtils {
     }
 
     /**
-     * Resolve SecretKey from Base64 decoded bytes or plain text UTF-8 fallback.
+     * Validate and initialize the SecretKey on startup. Fail fast if missing, placeholder, invalid Base64, or < 32 bytes.
      */
-    private SecretKey getSigningKey() {
+    @PostConstruct
+    public void validateAndInitSigningKey() {
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret key must not be empty. Please configure 'jwt.secret' (JWT_SECRET) in your environment.");
+        }
+
+        String trimmedSecret = jwtSecret.trim();
+
+        if (trimmedSecret.contains("CHANGE_ME")) {
+            throw new IllegalStateException("JWT secret key contains placeholder 'CHANGE_ME'. Please generate a secure 256-bit Base64 key before starting the application.");
+        }
+
         byte[] keyBytes;
         try {
-            keyBytes = Decoders.BASE64.decode(jwtSecret);
+            keyBytes = Decoders.BASE64.decode(trimmedSecret);
         } catch (Exception e) {
-            keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+            throw new IllegalStateException("JWT secret key must be a valid Base64-encoded string. Plain text fallback is not permitted: " + e.getMessage(), e);
         }
-        return Keys.hmacShaKeyFor(keyBytes);
+
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret key must be at least 32 bytes (256 bits) after Base64 decoding. Current key size: " + keyBytes.length + " bytes.");
+        }
+
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        log.info("JWT Signing Key successfully initialized with 256-bit+ HMAC-SHA key.");
+    }
+
+    /**
+     * Returns the cached SecretKey, ensuring initialization if called outside Spring lifecycle.
+     */
+    private SecretKey getSigningKey() {
+        if (this.signingKey == null) {
+            validateAndInitSigningKey();
+        }
+        return this.signingKey;
     }
 }
