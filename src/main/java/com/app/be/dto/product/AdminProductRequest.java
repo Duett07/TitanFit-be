@@ -1,5 +1,7 @@
 package com.app.be.dto.product;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -38,7 +40,19 @@ public class AdminProductRequest {
     @Pattern(regexp = "^(https?://.+)?$", message = "URL hình ảnh phải có định dạng hợp lệ bắt đầu bằng http:// hoặc https://")
     private String thumbnailUrl;
 
+    @JsonProperty("isActive")
+    @JsonAlias({"active", "isActive"})
     private Boolean isActive;
+
+    @JsonProperty("isActive")
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    @JsonProperty("isActive")
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
 
     @Valid
     private List<AdminVariantRequest> variants;

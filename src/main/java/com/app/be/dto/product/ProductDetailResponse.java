@@ -2,6 +2,7 @@ package com.app.be.dto.product;
 
 import com.app.be.dto.category.CategoryResponse;
 import com.app.be.entity.Product;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,10 +28,23 @@ public class ProductDetailResponse {
     private String description;
     private BigDecimal basePrice;
     private String thumbnailUrl;
+
+    @JsonProperty("isActive")
     private boolean isActive;
+
     private CategoryResponse category;
     private List<ProductVariantResponse> variants;
     private LocalDateTime createdAt;
+
+    @JsonProperty("isActive")
+    public boolean isActive() {
+        return isActive;
+    }
+
+    @JsonProperty("isActive")
+    public void setActive(boolean isActive) {
+        this.isActive = isActive;
+    }
 
     public static ProductDetailResponse fromEntity(Product product) {
         if (product == null) {
