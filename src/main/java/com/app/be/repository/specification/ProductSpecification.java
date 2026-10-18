@@ -54,6 +54,34 @@ public class ProductSpecification {
         };
     }
 
+    public static Specification<Product> filterAdminProducts(
+            String keyword,
+            String categorySlug,
+            Boolean isActive
+    ) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (isActive != null) {
+                predicates.add(cb.equal(root.get("isActive"), isActive));
+            }
+
+            if (StringUtils.hasText(keyword)) {
+                String escapedKeyword = escapeLikePattern(keyword);
+                if (StringUtils.hasText(escapedKeyword)) {
+                    String pattern = "%" + escapedKeyword.toLowerCase() + "%";
+                    predicates.add(cb.like(cb.lower(root.get("name")), pattern, ESCAPE_CHAR));
+                }
+            }
+
+            if (StringUtils.hasText(categorySlug)) {
+                predicates.add(cb.equal(root.get("categories").get("slug"), categorySlug.trim()));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
     /**
      * Escapes special wildcard characters for SQL LIKE query ('\', '%', '_')
      * and trims / limits length to MAX_KEYWORD_LENGTH characters to prevent

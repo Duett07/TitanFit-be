@@ -190,18 +190,20 @@ Sau khi server khởi động (ở môi trường Development), bạn có thể 
 | Phương thức | Endpoint | Mô tả | Quyền truy cập |
 |---|---|---|---|
 | `POST` | `/api/orders` | Tạo đơn hàng mới | Đã đăng nhập |
-| `GET` | `/api/orders/my-orders` | Xem lịch sử đơn hàng của tôi | Đã đăng nhập |
+| `GET` | `/api/orders/my-orders` | Xem lịch sử đơn hàng của tôi (hỗ trợ phân trang `page`, `size`, lọc `status`) | Đã đăng nhập |
 | `GET` | `/api/orders/{orderCode}` | Tra cứu trạng thái đơn hàng theo mã đơn | Công khai |
 
 ### 5. Dành cho Quản trị viên (`/api/admin`)
 | Phương thức | Endpoint | Mô tả | Quyền truy cập |
 |---|---|---|---|
-| `GET` | `/api/admin/products` | Danh sách toàn bộ sản phẩm (kèm ẩn/hiện) | `ROLE_ADMIN` |
+| `GET` | `/api/admin/stats` | Thống kê số lượng đơn hàng, doanh thu, sản phẩm và khách hàng | `ROLE_ADMIN` |
+| `GET` | `/api/admin/products` | Danh sách toàn bộ sản phẩm (hỗ trợ phân trang, tìm kiếm, lọc danh mục, trạng thái ẩn/hiện) | `ROLE_ADMIN` |
 | `POST` | `/api/admin/products` | Thêm mới sản phẩm kèm các biến thể SKU | `ROLE_ADMIN` |
 | `PUT` | `/api/admin/products/{id}` | Cập nhật thông tin sản phẩm và biến thể | `ROLE_ADMIN` |
 | `DELETE` | `/api/admin/products/{id}` | Xóa sản phẩm khỏi hệ thống | `ROLE_ADMIN` |
-| `GET` | `/api/admin/orders` | Quản lý danh sách đơn hàng toàn hệ thống | `ROLE_ADMIN` |
+| `GET` | `/api/admin/orders` | Quản lý danh sách đơn hàng toàn hệ thống (hỗ trợ phân trang `page`, `size`, lọc `status`, `paymentStatus`, `startDate`, `endDate`, `search`) | `ROLE_ADMIN` |
 | `PATCH`| `/api/admin/orders/{id}/status` | Cập nhật trạng thái đơn (PENDING, CONFIRMED, SHIPPING, COMPLETED, CANCELLED) | `ROLE_ADMIN` |
+| `PATCH`| `/api/admin/orders/{id}/payment-status` | Cập nhật trạng thái thanh toán (UNPAID, PAID, REFUNDED) | `ROLE_ADMIN` |
 
 ---
 

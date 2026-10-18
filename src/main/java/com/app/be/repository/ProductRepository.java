@@ -3,6 +3,7 @@ package com.app.be.repository;
 import com.app.be.entity.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -37,4 +38,10 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
 
     @EntityGraph(attributePaths = {"categories", "productVariants"})
     Optional<Product> findWithDetailsBySlug(String slug);
+
+    @Override
+    @EntityGraph(attributePaths = {"categories"})
+    Page<Product> findAll(Specification<Product> spec, Pageable pageable);
+
+    long countByIsActiveTrue();
 }

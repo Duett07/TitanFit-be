@@ -12,11 +12,11 @@ import java.math.BigDecimal;
 @Setter
 public class OrderItem extends BaseEntity {
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "variant_id")
     private ProductVariant productVariant;
 

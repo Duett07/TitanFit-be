@@ -1,5 +1,8 @@
 package com.app.be.entity;
 
+import com.app.be.enums.OrderStatus;
+import com.app.be.enums.PaymentMethod;
+import com.app.be.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,11 +16,12 @@ import java.util.List;
 @Setter
 public class Order extends BaseEntity {
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 20)
     private List<OrderItem> orderItems = new java.util.ArrayList<>();
 
     @Column(nullable = false, unique = true)

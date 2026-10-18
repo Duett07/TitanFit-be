@@ -13,7 +13,7 @@ import java.util.List;
 @Setter
 public class ProductVariant extends BaseEntity {
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 

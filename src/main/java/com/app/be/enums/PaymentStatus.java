@@ -1,4 +1,4 @@
-package com.app.be.entity;
+package com.app.be.enums;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 

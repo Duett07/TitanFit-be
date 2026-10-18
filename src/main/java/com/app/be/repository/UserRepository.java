@@ -17,4 +17,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByPhone(String phone);
 
     boolean existsByPhone(String phone);
+
+    long countByRole(com.app.be.enums.Role role);
 }
