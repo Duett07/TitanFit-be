@@ -23,9 +23,6 @@ public class Product extends BaseEntity {
     @org.hibernate.annotations.BatchSize(size = 20)
     private List<ProductVariant> productVariants;
 
-    @ManyToOne
-    private OrderItem orderItem;
-
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews;
 
