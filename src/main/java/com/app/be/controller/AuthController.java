@@ -20,6 +20,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -82,7 +84,8 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        UUID userId = userDetails != null ? userDetails.getId() : null;
         return ResponseEntity
-                .ok(ApiResponse.success("Lấy thông tin tài khoản thành công", authService.getCurrentUser(userDetails)));
+                .ok(ApiResponse.success("Lấy thông tin tài khoản thành công", authService.getCurrentUser(userId)));
     }
 }

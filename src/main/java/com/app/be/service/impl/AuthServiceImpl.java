@@ -13,7 +13,6 @@ import com.app.be.exception.UnauthorizedException;
 import com.app.be.repository.UserRepository;
 import com.app.be.security.jwt.JwtUtils;
 import com.app.be.security.jwt.TokenRedisService;
-import com.app.be.security.user.CustomUserDetails;
 import com.app.be.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -201,13 +200,13 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserResponse getCurrentUser(CustomUserDetails userDetails) {
-        if (userDetails == null) {
+    public UserResponse getCurrentUser(UUID userId) {
+        if (userId == null) {
             throw new UnauthorizedException("Người dùng chưa được xác thực");
         }
 
-        User user = userRepository.findById(userDetails.getId())
-                .orElse(userDetails.getUser());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Tài khoản người dùng không tồn tại hoặc đã bị khoá/xoá"));
 
         return UserResponse.fromEntity(user);
     }

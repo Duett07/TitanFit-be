@@ -48,20 +48,18 @@ public class AdminOrderController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody(required = false) UpdateOrderStatusRequest request,
-            @RequestParam(name = "newStatus", required = false) OrderStatus paramStatus
+            @Valid @RequestBody UpdateOrderStatusRequest request
     ) {
-        OrderResponse response = orderService.updateOrderStatus(id, request, paramStatus);
+        OrderResponse response = orderService.updateOrderStatus(id, request.getNewStatus());
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái đơn hàng thành công", response));
     }
 
     @PatchMapping("/{id}/payment-status")
     public ResponseEntity<ApiResponse<OrderResponse>> updatePaymentStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody(required = false) UpdatePaymentStatusRequest request,
-            @RequestParam(name = "paymentStatus", required = false) PaymentStatus paramStatus
+            @Valid @RequestBody UpdatePaymentStatusRequest request
     ) {
-        OrderResponse response = orderService.updatePaymentStatus(id, request, paramStatus);
+        OrderResponse response = orderService.updatePaymentStatus(id, request.getPaymentStatus());
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thanh toán thành công", response));
     }
 }

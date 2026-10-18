@@ -4,9 +4,10 @@ import com.app.be.dto.auth.AuthResponse;
 import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
-import com.app.be.security.user.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import java.util.UUID;
 
 public interface AuthService {
 
@@ -16,7 +17,7 @@ public interface AuthService {
 
     AuthResponse refreshToken(String refreshToken, HttpServletRequest request, HttpServletResponse response);
 
-    UserResponse getCurrentUser(CustomUserDetails userDetails);
+    UserResponse getCurrentUser(UUID userId);
 
     void logout(HttpServletRequest request, HttpServletResponse response);
 
