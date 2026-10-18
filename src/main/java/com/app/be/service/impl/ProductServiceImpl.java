@@ -37,8 +37,11 @@ public class ProductServiceImpl implements ProductService {
             BigDecimal maxPrice,
             String sortBy
     ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+
         Sort sort = resolveSort(sortBy);
-        Pageable pageable = PageRequest.of(page, size, sort);
+        Pageable pageable = PageRequest.of(safePage, safeSize, sort);
 
         Specification<Product> spec = ProductSpecification.filterProducts(
                 keyword, categorySlug, minPrice, maxPrice
