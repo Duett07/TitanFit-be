@@ -21,10 +21,9 @@ import com.app.be.repository.ProductVariantRepository;
 import com.app.be.repository.UserRepository;
 import com.app.be.security.user.CustomUserDetails;
 import com.app.be.service.OrderService;
+import com.app.be.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +53,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, CustomUserDetails userDetails) {
+        if (userDetails == null || userDetails.getId() == null) {
+            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện đặt hàng");
+        }
+
+        User user = userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new UnauthorizedException("Tài khoản người dùng không tồn tại hoặc đã bị khoá/xoá"));
+
         // Bước 1: Sinh mã đơn hàng duy nhất: TF- + 8 ký tự Base32
         String orderCode = generateUniqueOrderCode();
 
@@ -124,6 +130,7 @@ public class OrderServiceImpl implements OrderService {
         // Bước 4: Lưu Order với trạng thái ban đầu order_status = 'PENDING', payment_status = 'UNPAID'
         Order order = new Order();
         order.setOrderCode(orderCode);
+        order.setUser(user);
         order.setCustomerName(request.getCustomerName().trim());
         order.setPhone(request.getPhone().trim());
         order.setShippingAddress(request.getShippingAddress().trim());
@@ -132,16 +139,6 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus("PENDING");
         order.setPaymentStatus("UNPAID");
         order.setTotalAmount(totalAmount);
-
-        // Gắn thông tin người dùng nếu có tài khoản
-        if (userDetails != null && userDetails.getId() != null) {
-            userRepository.findById(userDetails.getId()).ifPresent(order::setUser);
-        } else {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails principalUser) {
-                userRepository.findById(principalUser.getId()).ifPresent(order::setUser);
-            }
-        }
 
         Order savedOrder = orderRepository.save(order);
 
@@ -156,12 +153,6 @@ public class OrderServiceImpl implements OrderService {
                 savedOrder.getOrderCode(), savedOrder.getTotalAmount(), savedItems.size());
 
         return OrderResponse.fromEntity(savedOrder);
-    }
-
-    @Override
-    @Transactional
-    public OrderResponse createOrder(CreateOrderRequest request) {
-        return createOrder(request, null);
     }
 
     @Override
@@ -225,18 +216,6 @@ public class OrderServiceImpl implements OrderService {
         return cleaned;
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public OrderResponse getOrderByCode(String orderCode) {
-        if (orderCode == null || orderCode.trim().isEmpty()) {
-            throw new BadRequestException("Mã đơn hàng không được để trống");
-        }
-
-        Order order = orderRepository.findWithDetailsByOrderCode(orderCode.trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim()));
-
-        return OrderResponse.fromEntity(order);
-    }
 
     @Override
     @Transactional(readOnly = true)
