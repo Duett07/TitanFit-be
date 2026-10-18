@@ -20,6 +20,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @Slf4j
@@ -84,7 +85,10 @@ public class AdminProductServiceImpl implements AdminProductService {
                 ProductVariant variant = new ProductVariant();
                 variant.setProduct(savedProduct);
                 variant.setVariantName(vReq.getVariantName() != null ? vReq.getVariantName().trim() : "Tiêu chuẩn");
-                variant.setPrice(vReq.getPrice() != null ? vReq.getPrice() : savedProduct.getBasePrice());
+                BigDecimal variantPrice = (vReq.getPrice() != null && vReq.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                        ? vReq.getPrice()
+                        : savedProduct.getBasePrice();
+                variant.setPrice(variantPrice);
                 variant.setStockQuantity(vReq.getStockQuantity() != null ? vReq.getStockQuantity() : 0);
 
                 String sku = vReq.getSku();
@@ -166,7 +170,11 @@ public class AdminProductServiceImpl implements AdminProductService {
                 }
 
                 if (vReq.getVariantName() != null) variant.setVariantName(vReq.getVariantName().trim());
-                if (vReq.getPrice() != null) variant.setPrice(vReq.getPrice());
+                if (vReq.getPrice() != null && vReq.getPrice().compareTo(BigDecimal.ZERO) > 0) {
+                    variant.setPrice(vReq.getPrice());
+                } else if (variant.getPrice() == null || variant.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                    variant.setPrice(savedProduct.getBasePrice());
+                }
                 if (vReq.getStockQuantity() != null) variant.setStockQuantity(vReq.getStockQuantity());
                 toSave.add(variant);
             }

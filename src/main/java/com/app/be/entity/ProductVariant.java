@@ -24,6 +24,9 @@ public class ProductVariant extends BaseEntity {
     @Unique
     private String sku;
     private String variantName;
+
+    @Column(nullable = false)
     private BigDecimal price;
+
     private int stockQuantity;
 }

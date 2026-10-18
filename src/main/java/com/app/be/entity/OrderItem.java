@@ -27,6 +27,9 @@ public class OrderItem extends BaseEntity {
 
     private String productName;
     private String variantName;
+
+    @Column(nullable = false)
     private BigDecimal price;
+
     private int quantity;
 }

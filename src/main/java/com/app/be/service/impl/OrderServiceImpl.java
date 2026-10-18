@@ -97,7 +97,13 @@ public class OrderServiceImpl implements OrderService {
             productVariantRepository.save(variant);
 
             // Bước 3: Lấy giá trực tiếp từ database (variant.getPrice()) để tính tổng tiền
-            BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            BigDecimal unitPrice = variant.getPrice();
+            if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
+                        ? variant.getProduct().getName()
+                        : variant.getVariantName();
+                throw new BadRequestException("Sản phẩm '" + productName + "' chưa có giá hợp lệ, không thể đặt hàng!");
+            }
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
             totalAmount = totalAmount.add(itemTotal);
 
