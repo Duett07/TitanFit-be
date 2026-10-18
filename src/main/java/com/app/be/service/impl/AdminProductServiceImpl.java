@@ -6,13 +6,16 @@ import com.app.be.dto.product.ProductSummaryResponse;
 import com.app.be.entity.Product;
 import com.app.be.entity.ProductVariant;
 import com.app.be.exception.ResourceNotFoundException;
+import com.app.be.exception.ConflictException;
 import com.app.be.repository.CategoryRepository;
+import com.app.be.repository.OrderItemRepository;
 import com.app.be.repository.ProductRepository;
 import com.app.be.repository.ProductVariantRepository;
 import com.app.be.service.AdminProductService;
 import com.app.be.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,7 @@ public class AdminProductServiceImpl implements AdminProductService {
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
     private final CategoryRepository categoryRepository;
+    private final OrderItemRepository orderItemRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -181,9 +185,24 @@ public class AdminProductServiceImpl implements AdminProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + id));
 
-        List<ProductVariant> variants = productVariantRepository.findByProductId(id);
-        productVariantRepository.deleteAll(variants);
-        productRepository.delete(product);
+        // Kiểm tra ràng buộc: Nếu sản phẩm đã từng phát sinh đơn hàng -> Chặn xóa và trả lỗi 409 Conflict
+        if (orderItemRepository.existsByProductVariantProductId(id)) {
+            throw new ConflictException(
+                    "Sản phẩm '" + product.getName() + "' đã có đơn hàng trong hệ thống, không thể xóa vĩnh viễn. Vui lòng tắt kích hoạt (ẩn sản phẩm) để ngừng kinh doanh!"
+            );
+        }
+
+        try {
+            List<ProductVariant> variants = productVariantRepository.findByProductId(id);
+            productVariantRepository.deleteAll(variants);
+            productRepository.delete(product);
+            productRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Không thể xóa sản phẩm ID {} do ràng buộc cơ sở dữ liệu: {}", id, ex.getMessage());
+            throw new ConflictException(
+                    "Không thể xóa sản phẩm '" + product.getName() + "' do tồn tại dữ liệu liên kết. Vui lòng ẩn sản phẩm thay vì xóa!"
+            );
+        }
 
         log.info("Admin deleted product: {}", product.getName());
     }
