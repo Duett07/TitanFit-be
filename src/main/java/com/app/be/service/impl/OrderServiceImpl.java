@@ -27,7 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.security.SecureRandom;
 
@@ -48,29 +51,43 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, CustomUserDetails userDetails) {
-        // Bước 1: Sinh mã đơn hàng duy nhất: TF- + 6 chữ số ngẫu nhiên
+        // Bước 1: Sinh mã đơn hàng duy nhất: TF- + 8 ký tự Base32
         String orderCode = generateUniqueOrderCode();
 
-        // Bước 2 & 3: Lặp qua từng item, kiểm tra tồn kho, trừ kho tức thì và tính tổng tiền từ DB
+        // Bước 2 & 3: Gom nhóm số lượng theo variantId, sắp xếp ID để tránh deadlock khi tranh chấp lock,
+        // kiểm tra tồn kho bằng Pessimistic Lock (SELECT FOR UPDATE) và trừ kho an toàn
+        Map<UUID, Integer> aggregatedQuantities = new LinkedHashMap<>();
+        for (OrderItemRequest itemRequest : request.getItems()) {
+            if (itemRequest.getVariantId() != null && itemRequest.getQuantity() != null) {
+                aggregatedQuantities.merge(itemRequest.getVariantId(), itemRequest.getQuantity(), Integer::sum);
+            }
+        }
+
+        List<UUID> sortedVariantIds = new ArrayList<>(aggregatedQuantities.keySet());
+        Collections.sort(sortedVariantIds);
+
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
-            ProductVariant variant = productVariantRepository.findById(itemRequest.getVariantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể sản phẩm với ID: " + itemRequest.getVariantId()));
+        for (UUID variantId : sortedVariantIds) {
+            int quantity = aggregatedQuantities.get(variantId);
 
-            // Kiểm tra: Nếu variant.getStockQuantity() < item.getQuantity() -> ném BadRequestException
-            if (variant.getStockQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Sản phẩm " + variant.getVariantName() + " không đủ hàng tồn kho!");
+            // Khóa dòng biến thể (SELECT ... FOR UPDATE) chống race condition
+            ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể sản phẩm với ID: " + variantId));
+
+            // Kiểm tra tồn kho dưới khóa bi quan
+            if (variant.getStockQuantity() < quantity) {
+                throw new BadRequestException("Sản phẩm '" + variant.getVariantName() + "' không đủ hàng tồn kho (yêu cầu: " + quantity + ", còn lại: " + variant.getStockQuantity() + ")!");
             }
 
-            // Trừ kho tức thì
-            variant.setStockQuantity(variant.getStockQuantity() - itemRequest.getQuantity());
+            // Trừ kho an toàn dưới khóa bi quan
+            variant.setStockQuantity(variant.getStockQuantity() - quantity);
             productVariantRepository.save(variant);
 
             // Bước 3: Lấy giá trực tiếp từ database (variant.getPrice()) để tính tổng tiền
             BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
-            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
             totalAmount = totalAmount.add(itemTotal);
 
             // Chuẩn bị snapshot cho OrderItem
@@ -82,7 +99,7 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setProductName(productName);
             orderItem.setVariantName(variant.getVariantName());
             orderItem.setPrice(unitPrice);
-            orderItem.setQuantity(itemRequest.getQuantity());
+            orderItem.setQuantity(quantity);
 
             orderItems.add(orderItem);
         }
@@ -255,15 +272,29 @@ public class OrderServiceImpl implements OrderService {
         // Đặc biệt: Nếu newStatus == 'CANCELLED' -> Tự động duyệt qua các OrderItem và cộng hoàn trả lại stock_quantity cho từng ProductVariant!
         if (newStatus == OrderStatus.CANCELLED) {
             if (order.getOrderItems() != null) {
+                // Gom nhóm số lượng hoàn kho theo variantId
+                Map<UUID, Integer> restoreQuantities = new LinkedHashMap<>();
                 for (OrderItem item : order.getOrderItems()) {
-                    ProductVariant variant = item.getProductVariant();
+                    if (item.getProductVariant() != null && item.getProductVariant().getId() != null) {
+                        restoreQuantities.merge(item.getProductVariant().getId(), item.getQuantity(), Integer::sum);
+                    }
+                }
+
+                // Sắp xếp thứ tự ID để khóa theo thứ tự nhất quán, tránh deadlock
+                List<UUID> sortedVariantIds = new ArrayList<>(restoreQuantities.keySet());
+                Collections.sort(sortedVariantIds);
+
+                for (UUID variantId : sortedVariantIds) {
+                    int qtyToRestore = restoreQuantities.get(variantId);
+                    ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
+                            .orElse(null);
                     if (variant != null) {
                         int currentStock = variant.getStockQuantity();
-                        int restoredStock = currentStock + item.getQuantity();
+                        int restoredStock = currentStock + qtyToRestore;
                         variant.setStockQuantity(restoredStock);
                         productVariantRepository.save(variant);
-                        log.info("Hoàn trả tồn kho cho SKU '{}': {} + {} -> {}",
-                                variant.getSku(), currentStock, item.getQuantity(), restoredStock);
+                        log.info("Hoàn trả tồn kho cho SKU '{}' (ID: {}): {} + {} -> {}",
+                                variant.getSku(), variantId, currentStock, qtyToRestore, restoredStock);
                     }
                 }
             }
