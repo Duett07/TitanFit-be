@@ -1,11 +1,14 @@
 package com.app.be.service.impl;
 
 import com.app.be.dto.order.CreateOrderRequest;
-import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
+import com.app.be.dto.order.PaymentMethod;
+import com.app.be.dto.order.PaymentStatus;
+import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
+import com.app.be.dto.order.UpdatePaymentStatusRequest;
 import com.app.be.entity.Order;
 import com.app.be.entity.OrderItem;
 import com.app.be.entity.ProductVariant;
@@ -258,23 +261,27 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("Trạng thái mới không được để trống");
         }
 
-        if (newStatus == OrderStatus.PENDING) {
-            throw new BadRequestException("Không thể chuyển đơn hàng về trạng thái PENDING");
-        }
-
         Order order = orderRepository.findWithDetailsById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
 
-        if (order.getOrderStatus() != null && order.getOrderStatus().equalsIgnoreCase(newStatus.name())) {
+        OrderStatus currentStatus = OrderStatus.fromString(order.getOrderStatus());
+        if (currentStatus == null) {
+            throw new BadRequestException("Trạng thái hiện tại của đơn hàng không hợp lệ: " + order.getOrderStatus());
+        }
+
+        if (currentStatus == newStatus) {
             throw new BadRequestException("Đơn hàng đã ở trạng thái " + newStatus.name() + " rồi");
         }
 
-        if ("CANCELLED".equalsIgnoreCase(order.getOrderStatus())) {
-            throw new BadRequestException("Đơn hàng đã bị HỦY trước đó, không thể thay đổi trạng thái");
-        }
-
-        if ("COMPLETED".equalsIgnoreCase(order.getOrderStatus())) {
-            throw new BadRequestException("Đơn hàng đã HOÀN THÀNH, không thể thay đổi trạng thái");
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            if (currentStatus == OrderStatus.CANCELLED) {
+                throw new BadRequestException("Đơn hàng đã bị HỦY trước đó, không thể thay đổi trạng thái");
+            }
+            if (currentStatus == OrderStatus.COMPLETED) {
+                throw new BadRequestException("Đơn hàng đã HOÀN THÀNH, không thể thay đổi trạng thái");
+            }
+            throw new BadRequestException("Không thể chuyển trạng thái đơn hàng từ " + currentStatus.name() + " sang " + newStatus.name() +
+                    ". Các trạng thái tiếp theo hợp lệ: " + currentStatus.nextAllowedStatuses());
         }
 
         // Đặc biệt: Nếu newStatus == 'CANCELLED' -> Tự động duyệt qua các OrderItem và cộng hoàn trả lại stock_quantity cho từng ProductVariant!
@@ -306,6 +313,21 @@ public class OrderServiceImpl implements OrderService {
                     }
                 }
             }
+
+            // Nếu đơn hàng trước đó đã thanh toán (PAID), tự động chuyển sang REFUNDED để theo dõi đối soát
+            if (PaymentStatus.PAID.name().equalsIgnoreCase(order.getPaymentStatus())) {
+                order.setPaymentStatus(PaymentStatus.REFUNDED.name());
+                log.info("Đơn hàng {} bị hủy sau khi đã thanh toán, chuyển paymentStatus sang REFUNDED", order.getOrderCode());
+            }
+        }
+
+        // Nếu chuyển sang COMPLETED: Với đơn COD và paymentStatus đang là UNPAID -> Tự động chuyển sang PAID
+        if (newStatus == OrderStatus.COMPLETED) {
+            if (PaymentMethod.COD.name().equalsIgnoreCase(order.getPaymentMethod())
+                    && PaymentStatus.UNPAID.name().equalsIgnoreCase(order.getPaymentStatus())) {
+                order.setPaymentStatus(PaymentStatus.PAID.name());
+                log.info("Đơn hàng COD {} đã hoàn thành, tự động cập nhật paymentStatus sang PAID", order.getOrderCode());
+            }
         }
 
         order.setOrderStatus(newStatus.name());
@@ -330,6 +352,44 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return updateOrderStatus(orderId, targetStatus);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updatePaymentStatus(UUID orderId, PaymentStatus newStatus) {
+        if (newStatus == null) {
+            throw new BadRequestException("Trạng thái thanh toán mới không được để trống");
+        }
+
+        Order order = orderRepository.findWithDetailsById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        if (newStatus.name().equalsIgnoreCase(order.getPaymentStatus())) {
+            throw new BadRequestException("Đơn hàng đã ở trạng thái thanh toán " + newStatus.name() + " rồi");
+        }
+
+        order.setPaymentStatus(newStatus.name());
+        Order savedOrder = orderRepository.save(order);
+
+        log.info("Cập nhật trạng thái thanh toán đơn hàng {} sang {}", savedOrder.getOrderCode(), newStatus.name());
+        return OrderResponse.fromEntity(savedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updatePaymentStatus(UUID orderId, UpdatePaymentStatusRequest request, PaymentStatus paramStatus) {
+        PaymentStatus targetStatus = null;
+        if (request != null && request.getPaymentStatus() != null) {
+            targetStatus = request.getPaymentStatus();
+        } else if (paramStatus != null) {
+            targetStatus = paramStatus;
+        }
+
+        if (targetStatus == null) {
+            throw new BadRequestException("Trạng thái thanh toán mới không được để trống (UNPAID, PAID, REFUNDED)");
+        }
+
+        return updatePaymentStatus(orderId, targetStatus);
     }
 
     /**
