@@ -1,10 +1,12 @@
 package com.app.be.service;
 
 import com.app.be.dto.order.CreateOrderRequest;
-import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
+import com.app.be.dto.order.PaymentStatus;
+import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
+import com.app.be.dto.order.UpdatePaymentStatusRequest;
 import com.app.be.security.user.CustomUserDetails;
 
 import java.util.List;
@@ -28,6 +30,10 @@ public interface OrderService {
     OrderResponse updateOrderStatus(UUID orderId, OrderStatus newStatus);
 
     OrderResponse updateOrderStatus(UUID orderId, UpdateOrderStatusRequest request, OrderStatus paramStatus);
+
+    OrderResponse updatePaymentStatus(UUID orderId, PaymentStatus newStatus);
+
+    OrderResponse updatePaymentStatus(UUID orderId, UpdatePaymentStatusRequest request, PaymentStatus paramStatus);
 
     List<OrderResponse> getAllOrders();
 }

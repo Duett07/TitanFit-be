@@ -3,7 +3,9 @@ package com.app.be.controller.admin;
 import com.app.be.dto.ApiResponse;
 import com.app.be.dto.order.OrderResponse;
 import com.app.be.dto.order.OrderStatus;
+import com.app.be.dto.order.PaymentStatus;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
+import com.app.be.dto.order.UpdatePaymentStatusRequest;
 import com.app.be.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,5 +36,15 @@ public class AdminOrderController {
     ) {
         OrderResponse response = orderService.updateOrderStatus(id, request, paramStatus);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái đơn hàng thành công", response));
+    }
+
+    @PatchMapping("/{id}/payment-status")
+    public ResponseEntity<ApiResponse<OrderResponse>> updatePaymentStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) UpdatePaymentStatusRequest request,
+            @RequestParam(name = "paymentStatus", required = false) PaymentStatus paramStatus
+    ) {
+        OrderResponse response = orderService.updatePaymentStatus(id, request, paramStatus);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thanh toán thành công", response));
     }
 }
