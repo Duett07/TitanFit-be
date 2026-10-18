@@ -16,11 +16,7 @@ public interface OrderService {
 
     OrderResponse createOrder(CreateOrderRequest request, CustomUserDetails userDetails);
 
-    OrderResponse createOrder(CreateOrderRequest request);
-
     OrderResponse getOrderByCode(String orderCode, CustomUserDetails userDetails);
-
-    OrderResponse getOrderByCode(String orderCode);
 
     OrderResponse trackOrder(TrackOrderRequest request);
 
