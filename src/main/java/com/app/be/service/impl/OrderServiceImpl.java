@@ -1,27 +1,18 @@
 package com.app.be.service.impl;
 
+import com.app.be.constant.OrderMessages;
+import com.app.be.dto.common.PageResponse;
 import com.app.be.dto.order.CreateOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
-import com.app.be.dto.common.PageResponse;
-import com.app.be.enums.OrderStatus;
-import com.app.be.enums.PaymentMethod;
-import com.app.be.enums.PaymentStatus;
-import com.app.be.enums.Role;
-import com.app.be.repository.specification.OrderSpecification;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
-
-import java.time.LocalDate;
 import com.app.be.dto.order.TrackOrderRequest;
-import com.app.be.dto.order.UpdateOrderStatusRequest;
-import com.app.be.dto.order.UpdatePaymentStatusRequest;
 import com.app.be.entity.Order;
 import com.app.be.entity.OrderItem;
 import com.app.be.entity.ProductVariant;
+import com.app.be.entity.User;
+import com.app.be.enums.OrderStatus;
+import com.app.be.enums.PaymentMethod;
+import com.app.be.enums.PaymentStatus;
 import com.app.be.exception.BadRequestException;
 import com.app.be.exception.ResourceNotFoundException;
 import com.app.be.exception.UnauthorizedException;
@@ -29,22 +20,27 @@ import com.app.be.repository.OrderItemRepository;
 import com.app.be.repository.OrderRepository;
 import com.app.be.repository.ProductVariantRepository;
 import com.app.be.repository.UserRepository;
-import com.app.be.security.user.CustomUserDetails;
+import com.app.be.repository.specification.OrderSpecification;
 import com.app.be.service.OrderService;
-import com.app.be.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.security.SecureRandom;
 
 @Slf4j
 @Service
@@ -62,13 +58,13 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderResponse createOrder(CreateOrderRequest request, CustomUserDetails userDetails) {
-        if (userDetails == null || userDetails.getId() == null) {
-            throw new UnauthorizedException("Vui lòng đăng nhập để thực hiện đặt hàng");
+    public OrderResponse createOrder(CreateOrderRequest request, UUID userId) {
+        if (userId == null) {
+            throw new UnauthorizedException(OrderMessages.LOGIN_REQUIRED);
         }
 
-        User user = userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new UnauthorizedException("Tài khoản người dùng không tồn tại hoặc đã bị khoá/xoá"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException(OrderMessages.USER_NOT_FOUND_OR_LOCKED));
 
         // Bước 1: Sinh mã đơn hàng duy nhất: TF- + 8 ký tự Base32
         String orderCode = generateUniqueOrderCode();
@@ -93,19 +89,24 @@ public class OrderServiceImpl implements OrderService {
 
             // Khóa dòng biến thể (SELECT ... FOR UPDATE) chống race condition
             ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể sản phẩm với ID: " + variantId));
+                    .orElseThrow(() -> new ResourceNotFoundException(OrderMessages.VARIANT_NOT_FOUND_PREFIX + variantId));
 
             // Kiểm tra: Sản phẩm có đang được phép kinh doanh không (isActive)
             if (variant.getProduct() == null || !variant.getProduct().isActive()) {
                 String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
                         ? variant.getProduct().getName()
                         : variant.getVariantName();
-                throw new BadRequestException("Sản phẩm '" + productName + "' hiện không khả dụng hoặc đã ngừng kinh doanh!");
+                throw new BadRequestException(String.format(OrderMessages.PRODUCT_UNAVAILABLE, productName));
             }
 
             // Kiểm tra tồn kho dưới khóa bi quan
             if (variant.getStockQuantity() < quantity) {
-                throw new BadRequestException("Sản phẩm '" + variant.getVariantName() + "' không đủ hàng tồn kho (yêu cầu: " + quantity + ", còn lại: " + variant.getStockQuantity() + ")!");
+                throw new BadRequestException(String.format(
+                        OrderMessages.INSUFFICIENT_STOCK,
+                        variant.getVariantName(),
+                        quantity,
+                        variant.getStockQuantity()
+                ));
             }
 
             // Trừ kho an toàn dưới khóa bi quan
@@ -118,7 +119,7 @@ public class OrderServiceImpl implements OrderService {
                 String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
                         ? variant.getProduct().getName()
                         : variant.getVariantName();
-                throw new BadRequestException("Sản phẩm '" + productName + "' chưa có giá hợp lệ, không thể đặt hàng!");
+                throw new BadRequestException(String.format(OrderMessages.INVALID_PRICE, productName));
             }
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
             totalAmount = totalAmount.add(itemTotal);
@@ -167,49 +168,45 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public OrderResponse getOrderByCode(String orderCode, CustomUserDetails userDetails) {
-        if (userDetails == null || userDetails.getId() == null) {
-            throw new UnauthorizedException("Người dùng chưa được xác thực");
+    public OrderResponse getOrderByCode(String orderCode, UUID userId, boolean isAdmin) {
+        if (userId == null) {
+            throw new UnauthorizedException(OrderMessages.USER_UNAUTHENTICATED);
         }
 
         if (orderCode == null || orderCode.trim().isEmpty()) {
-            throw new BadRequestException("Mã đơn hàng không được để trống");
+            throw new BadRequestException(OrderMessages.ORDER_CODE_EMPTY);
         }
 
         Order order = orderRepository.findWithDetailsByOrderCode(orderCode.trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim()));
+                .orElseThrow(() -> new ResourceNotFoundException(OrderMessages.ORDER_NOT_FOUND_PREFIX + orderCode.trim()));
 
-        boolean isAdmin = userDetails.getAuthorities() != null && userDetails.getAuthorities().stream()
-                .anyMatch(auth -> Role.ROLE_ADMIN.name().equalsIgnoreCase(auth.getAuthority()));
-
-        boolean isOwner = order.getUser() != null && userDetails.getId().equals(order.getUser().getId());
+        boolean isOwner = order.getUser() != null && userId.equals(order.getUser().getId());
 
         if (!isAdmin && !isOwner) {
-            throw new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim());
+            throw new ResourceNotFoundException(OrderMessages.ORDER_NOT_FOUND_PREFIX + orderCode.trim());
         }
 
         return OrderResponse.fromEntity(order);
     }
 
-    
     @Override
     @Transactional(readOnly = true)
     public OrderResponse trackOrder(TrackOrderRequest request) {
         if (request == null || request.getOrderCode() == null || request.getOrderCode().trim().isEmpty()) {
-            throw new BadRequestException("Mã đơn hàng không được để trống");
+            throw new BadRequestException(OrderMessages.ORDER_CODE_EMPTY);
         }
         if (request.getPhone() == null || request.getPhone().trim().isEmpty()) {
-            throw new BadRequestException("Số điện thoại không được để trống");
+            throw new BadRequestException(OrderMessages.PHONE_EMPTY);
         }
 
         Order order = orderRepository.findWithDetailsByOrderCode(request.getOrderCode().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng hoặc số điện thoại không trùng khớp"));
+                .orElseThrow(() -> new ResourceNotFoundException(OrderMessages.ORDER_OR_PHONE_MISMATCH));
 
         String inputPhone = normalizePhone(request.getPhone());
         String orderPhone = normalizePhone(order.getPhone());
 
         if (!inputPhone.equals(orderPhone)) {
-            throw new ResourceNotFoundException("Không tìm thấy đơn hàng hoặc số điện thoại không trùng khớp");
+            throw new ResourceNotFoundException(OrderMessages.ORDER_OR_PHONE_MISMATCH);
         }
 
         return OrderResponse.fromEntity(order);
@@ -226,17 +223,16 @@ public class OrderServiceImpl implements OrderService {
         return cleaned;
     }
 
-
     @Override
     @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getMyOrders(
-            CustomUserDetails userDetails,
+            UUID userId,
             int page,
             int size,
             OrderStatus status
     ) {
-        if (userDetails == null || userDetails.getId() == null) {
-            throw new UnauthorizedException("Người dùng chưa được xác thực");
+        if (userId == null) {
+            throw new UnauthorizedException(OrderMessages.USER_UNAUTHENTICATED);
         }
 
         int safePage = Math.max(0, page);
@@ -244,7 +240,7 @@ public class OrderServiceImpl implements OrderService {
 
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<Order> spec = OrderSpecification.filterOrders(
-                userDetails.getId(), status, null, null, null, null
+                userId, status, null, null, null, null
         );
 
         Page<Order> orderPage = orderRepository.findAll(spec, pageable);
@@ -257,12 +253,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> getMyOrders(CustomUserDetails userDetails) {
-        if (userDetails == null || userDetails.getId() == null) {
-            throw new UnauthorizedException("Người dùng chưa được xác thực");
+    public List<OrderResponse> getMyOrders(UUID userId) {
+        if (userId == null) {
+            throw new UnauthorizedException(OrderMessages.USER_UNAUTHENTICATED);
         }
 
-        List<Order> orders = orderRepository.findByUser_IdOrderByCreatedAtDesc(userDetails.getId());
+        List<Order> orders = orderRepository.findByUser_IdOrderByCreatedAtDesc(userId);
         return orders.stream()
                 .map(OrderResponse::fromEntity)
                 .toList();
@@ -308,30 +304,34 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse updateOrderStatus(UUID orderId, OrderStatus newStatus) {
         if (newStatus == null) {
-            throw new BadRequestException("Trạng thái mới không được để trống");
+            throw new BadRequestException(OrderMessages.STATUS_REQUIRED);
         }
 
         Order order = orderRepository.findWithDetailsById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException(OrderMessages.ORDER_NOT_FOUND_BY_ID_PREFIX + orderId));
 
         OrderStatus currentStatus = order.getOrderStatus();
         if (currentStatus == null) {
-            throw new BadRequestException("Trạng thái hiện tại của đơn hàng không hợp lệ");
+            throw new BadRequestException(OrderMessages.CURRENT_STATUS_INVALID);
         }
 
         if (currentStatus == newStatus) {
-            throw new BadRequestException("Đơn hàng đã ở trạng thái " + newStatus.name() + " rồi");
+            throw new BadRequestException(String.format(OrderMessages.ALREADY_IN_STATUS, newStatus.name()));
         }
 
         if (!currentStatus.canTransitionTo(newStatus)) {
             if (currentStatus == OrderStatus.CANCELLED) {
-                throw new BadRequestException("Đơn hàng đã bị HỦY trước đó, không thể thay đổi trạng thái");
+                throw new BadRequestException(OrderMessages.CANCELLED_CANNOT_CHANGE);
             }
             if (currentStatus == OrderStatus.COMPLETED) {
-                throw new BadRequestException("Đơn hàng đã HOÀN THÀNH, không thể thay đổi trạng thái");
+                throw new BadRequestException(OrderMessages.COMPLETED_CANNOT_CHANGE);
             }
-            throw new BadRequestException("Không thể chuyển trạng thái đơn hàng từ " + currentStatus.name() + " sang " + newStatus.name() +
-                    ". Các trạng thái tiếp theo hợp lệ: " + currentStatus.nextAllowedStatuses());
+            throw new BadRequestException(String.format(
+                    OrderMessages.INVALID_STATUS_TRANSITION,
+                    currentStatus.name(),
+                    newStatus.name(),
+                    currentStatus.nextAllowedStatuses()
+            ));
         }
 
         // Đặc biệt: Nếu newStatus == 'CANCELLED' -> Tự động duyệt qua các OrderItem và cộng hoàn trả lại stock_quantity cho từng ProductVariant!
@@ -388,33 +388,16 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderResponse updateOrderStatus(UUID orderId, UpdateOrderStatusRequest request, OrderStatus paramStatus) {
-        OrderStatus targetStatus = null;
-        if (request != null && request.getNewStatus() != null) {
-            targetStatus = request.getNewStatus();
-        } else if (paramStatus != null) {
-            targetStatus = paramStatus;
-        }
-
-        if (targetStatus == null) {
-            throw new BadRequestException("Trạng thái mới (newStatus) không được để trống (CONFIRMED, SHIPPING, COMPLETED, CANCELLED)");
-        }
-
-        return updateOrderStatus(orderId, targetStatus);
-    }
-
-    @Override
-    @Transactional
     public OrderResponse updatePaymentStatus(UUID orderId, PaymentStatus newStatus) {
         if (newStatus == null) {
-            throw new BadRequestException("Trạng thái thanh toán mới không được để trống");
+            throw new BadRequestException(OrderMessages.PAYMENT_STATUS_REQUIRED);
         }
 
         Order order = orderRepository.findWithDetailsById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException(OrderMessages.ORDER_NOT_FOUND_BY_ID_PREFIX + orderId));
 
         if (order.getPaymentStatus() == newStatus) {
-            throw new BadRequestException("Đơn hàng đã ở trạng thái thanh toán " + newStatus.name() + " rồi");
+            throw new BadRequestException(String.format(OrderMessages.ALREADY_IN_PAYMENT_STATUS, newStatus.name()));
         }
 
         order.setPaymentStatus(newStatus);
@@ -422,23 +405,6 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Cập nhật trạng thái thanh toán đơn hàng {} sang {}", savedOrder.getOrderCode(), newStatus.name());
         return OrderResponse.fromEntity(savedOrder);
-    }
-
-    @Override
-    @Transactional
-    public OrderResponse updatePaymentStatus(UUID orderId, UpdatePaymentStatusRequest request, PaymentStatus paramStatus) {
-        PaymentStatus targetStatus = null;
-        if (request != null && request.getPaymentStatus() != null) {
-            targetStatus = request.getPaymentStatus();
-        } else if (paramStatus != null) {
-            targetStatus = paramStatus;
-        }
-
-        if (targetStatus == null) {
-            throw new BadRequestException("Trạng thái thanh toán mới không được để trống (UNPAID, PAID, REFUNDED)");
-        }
-
-        return updatePaymentStatus(orderId, targetStatus);
     }
 
     /**
