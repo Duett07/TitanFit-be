@@ -24,6 +24,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -77,9 +78,19 @@ public class AuthServiceImpl implements AuthService {
         user.setPhone(phone);
         user.setRole("ROLE_CUSTOMER"); // Default role
 
-        User savedUser = userRepository.save(user);
-
-        return UserResponse.fromEntity(savedUser);
+        try {
+            User savedUser = userRepository.saveAndFlush(user);
+            return UserResponse.fromEntity(savedUser);
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Xung đột trùng lặp dữ liệu người dùng khi đăng ký (race condition): {}", ex.getMessage());
+            if (userRepository.existsByEmail(email)) {
+                throw new DuplicateResourceException("Email đã được sử dụng");
+            }
+            if (phone != null && userRepository.existsByPhone(phone)) {
+                throw new DuplicateResourceException("Số điện thoại đã được sử dụng");
+            }
+            throw new DuplicateResourceException("Email hoặc số điện thoại đã được sử dụng");
+        }
     }
 
     @Override
