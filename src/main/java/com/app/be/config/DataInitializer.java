@@ -1,5 +1,6 @@
 package com.app.be.config;
 
+import com.app.be.entity.Role;
 import com.app.be.entity.User;
 import com.app.be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +91,7 @@ public class DataInitializer implements CommandLineRunner {
             admin.setPassword(passwordEncoder.encode(adminPassword.trim()));
             admin.setFullName("Quản trị viên TitanFit");
             admin.setPhone(adminPhone != null && !adminPhone.isBlank() ? adminPhone.trim() : "0900000001");
-            admin.setRole("ROLE_ADMIN");
+            admin.setRole(Role.ROLE_ADMIN);
 
             userRepository.save(admin);
             log.info("Initialized admin account: {}", email);
@@ -117,7 +118,7 @@ public class DataInitializer implements CommandLineRunner {
             buyer.setPassword(passwordEncoder.encode(buyerPassword.trim()));
             buyer.setFullName("Nguyễn Hoàng");
             buyer.setPhone(buyerPhone != null && !buyerPhone.isBlank() ? buyerPhone.trim() : "0912345678");
-            buyer.setRole("ROLE_CUSTOMER");
+            buyer.setRole(Role.ROLE_CUSTOMER);
 
             userRepository.save(buyer);
             log.info("Initialized default demo buyer account: {}", email);

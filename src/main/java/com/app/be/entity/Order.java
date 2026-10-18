@@ -34,14 +34,17 @@ public class Order extends BaseEntity {
 
     private String note;
 
-    @Column(nullable = false)
-    private String paymentMethod;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private PaymentMethod paymentMethod;
 
-    @Column(nullable = false)
-    private String paymentStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private PaymentStatus paymentStatus;
 
-    @Column(nullable = false)
-    private String orderStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private OrderStatus orderStatus;
 
     @Column(nullable = false)
     private BigDecimal totalAmount;

@@ -1,4 +1,4 @@
-package com.app.be.dto.order;
+package com.app.be.entity;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 

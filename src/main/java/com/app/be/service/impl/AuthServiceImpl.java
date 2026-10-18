@@ -4,6 +4,7 @@ import com.app.be.dto.auth.AuthResponse;
 import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
+import com.app.be.entity.Role;
 import com.app.be.entity.User;
 import com.app.be.exception.BadRequestException;
 import com.app.be.exception.DuplicateResourceException;
@@ -76,7 +77,7 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName().trim());
         user.setPhone(phone);
-        user.setRole("ROLE_CUSTOMER"); // Default role
+        user.setRole(Role.ROLE_CUSTOMER); // Default role
 
         try {
             User savedUser = userRepository.saveAndFlush(user);

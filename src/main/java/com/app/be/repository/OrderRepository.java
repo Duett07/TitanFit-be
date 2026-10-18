@@ -1,6 +1,7 @@
 package com.app.be.repository;
 
 import com.app.be.entity.Order;
+import com.app.be.entity.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -22,9 +23,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByUser_Id(UUID userId);
 
-    Page<Order> findByOrderStatus(String orderStatus, Pageable pageable);
+    Page<Order> findByOrderStatus(OrderStatus orderStatus, Pageable pageable);
 
-    Page<Order> findByUser_IdAndOrderStatus(UUID userId, String orderStatus, Pageable pageable);
+    Page<Order> findByUser_IdAndOrderStatus(UUID userId, OrderStatus orderStatus, Pageable pageable);
 
     @EntityGraph(attributePaths = {"orderItems", "orderItems.productVariant"})
     List<Order> findByUser_IdOrderByCreatedAtDesc(UUID userId);

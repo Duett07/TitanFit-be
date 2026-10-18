@@ -25,10 +25,8 @@ public class CustomUserDetails implements UserDetails {
 
     public static CustomUserDetails build(User user) {
         List<GrantedAuthority> authorities = new ArrayList<>();
-        if (user.getRole() != null && !user.getRole().trim().isEmpty()) {
-            String role = user.getRole().trim();
-            String formattedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase();
-            authorities.add(new SimpleGrantedAuthority(formattedRole));
+        if (user.getRole() != null) {
+            authorities.add(new SimpleGrantedAuthority(user.getRole().name()));
         }
 
         return new CustomUserDetails(

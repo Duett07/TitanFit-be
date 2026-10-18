@@ -1,4 +1,4 @@
-package com.app.be.dto.order;
+package com.app.be.entity;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 
@@ -42,4 +42,3 @@ public enum OrderStatus {
         throw new IllegalArgumentException("Trạng thái đơn hàng '" + value + "' không hợp lệ. Chỉ chấp nhận: CONFIRMED, SHIPPING, COMPLETED, CANCELLED");
     }
 }
-
