@@ -30,9 +30,11 @@ public class AdminProductController {
     @PatchMapping("/{id}/toggle-active")
     public ResponseEntity<ApiResponse<ProductSummaryResponse>> toggleActive(
             @PathVariable UUID id,
-            @RequestParam(required = false) Boolean active
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) Boolean isActive
     ) {
-        ProductSummaryResponse response = adminProductService.toggleActive(id, active);
+        Boolean targetActive = active != null ? active : isActive;
+        ProductSummaryResponse response = adminProductService.toggleActive(id, targetActive);
         return ResponseEntity.ok(ApiResponse.success("Đổi trạng thái sản phẩm thành công", response));
     }
 
