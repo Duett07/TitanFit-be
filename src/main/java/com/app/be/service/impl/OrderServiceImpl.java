@@ -76,6 +76,14 @@ public class OrderServiceImpl implements OrderService {
             ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể sản phẩm với ID: " + variantId));
 
+            // Kiểm tra: Sản phẩm có đang được phép kinh doanh không (isActive)
+            if (variant.getProduct() == null || !variant.getProduct().isActive()) {
+                String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
+                        ? variant.getProduct().getName()
+                        : variant.getVariantName();
+                throw new BadRequestException("Sản phẩm '" + productName + "' hiện không khả dụng hoặc đã ngừng kinh doanh!");
+            }
+
             // Kiểm tra tồn kho dưới khóa bi quan
             if (variant.getStockQuantity() < quantity) {
                 throw new BadRequestException("Sản phẩm '" + variant.getVariantName() + "' không đủ hàng tồn kho (yêu cầu: " + quantity + ", còn lại: " + variant.getStockQuantity() + ")!");
