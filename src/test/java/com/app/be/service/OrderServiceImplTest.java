@@ -77,6 +77,7 @@ class OrderServiceImplTest {
 
         Product product = new Product();
         product.setName("Whey Protein");
+        product.setActive(true);
 
         variantA = new ProductVariant();
         variantA.setId(variantIdA);
@@ -144,6 +145,28 @@ class OrderServiceImplTest {
         BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(request));
         assertTrue(ex.getMessage().contains("không đủ hàng tồn kho"));
         assertEquals(10, variantA.getStockQuantity());
+        verify(productVariantRepository, never()).save(variantA);
+    }
+
+    @Test
+    @DisplayName("createOrder: Ném BadRequestException khi sản phẩm đã bị ẩn (isActive = false)")
+    void shouldThrowBadRequestWhenProductIsInactive() {
+        variantA.getProduct().setActive(false);
+
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .customerName("Nguyen Van A")
+                .phone("0987654321")
+                .shippingAddress("123 Duong ABC")
+                .paymentMethod(PaymentMethod.COD)
+                .items(List.of(
+                        OrderItemRequest.builder().variantId(variantIdA).quantity(1).build()
+                ))
+                .build();
+
+        when(productVariantRepository.findByIdForUpdate(variantIdA)).thenReturn(Optional.of(variantA));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(request));
+        assertTrue(ex.getMessage().contains("hiện không khả dụng hoặc đã ngừng kinh doanh"));
         verify(productVariantRepository, never()).save(variantA);
     }
 
@@ -255,6 +278,10 @@ class OrderServiceImplTest {
             v.setVariantName("Whey Concurrency");
             v.setPrice(BigDecimal.valueOf(100_000));
             v.setStockQuantity(currentStock.get());
+            Product p = new Product();
+            p.setName("Whey Protein");
+            p.setActive(true);
+            v.setProduct(p);
             return Optional.of(v);
         });
 
