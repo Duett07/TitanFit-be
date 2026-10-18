@@ -1,5 +1,6 @@
 package com.app.be.dto.order;
 
+import com.app.be.entity.OrderStatus;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

@@ -2,8 +2,8 @@ package com.app.be.service;
 
 import com.app.be.dto.order.CreateOrderRequest;
 import com.app.be.dto.order.OrderResponse;
-import com.app.be.dto.order.OrderStatus;
-import com.app.be.dto.order.PaymentStatus;
+import com.app.be.entity.OrderStatus;
+import com.app.be.entity.PaymentStatus;
 import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
 import com.app.be.dto.order.UpdatePaymentStatusRequest;

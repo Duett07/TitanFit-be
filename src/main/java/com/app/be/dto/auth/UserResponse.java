@@ -33,7 +33,7 @@ public class UserResponse {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .role(user.getRole())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }

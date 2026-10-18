@@ -3,9 +3,10 @@ package com.app.be.service.impl;
 import com.app.be.dto.order.CreateOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
-import com.app.be.dto.order.OrderStatus;
-import com.app.be.dto.order.PaymentMethod;
-import com.app.be.dto.order.PaymentStatus;
+import com.app.be.entity.OrderStatus;
+import com.app.be.entity.PaymentMethod;
+import com.app.be.entity.PaymentStatus;
+import com.app.be.entity.Role;
 import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
 import com.app.be.dto.order.UpdatePaymentStatusRequest;
@@ -135,9 +136,9 @@ public class OrderServiceImpl implements OrderService {
         order.setPhone(request.getPhone().trim());
         order.setShippingAddress(request.getShippingAddress().trim());
         order.setNote(request.getNote() != null ? request.getNote().trim() : null);
-        order.setPaymentMethod(request.getPaymentMethod().name());
-        order.setOrderStatus("PENDING");
-        order.setPaymentStatus("UNPAID");
+        order.setPaymentMethod(request.getPaymentMethod());
+        order.setOrderStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
         order.setTotalAmount(totalAmount);
 
         Order savedOrder = orderRepository.save(order);
@@ -170,7 +171,7 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode.trim()));
 
         boolean isAdmin = userDetails.getAuthorities() != null && userDetails.getAuthorities().stream()
-                .anyMatch(auth -> "ROLE_ADMIN".equalsIgnoreCase(auth.getAuthority()));
+                .anyMatch(auth -> Role.ROLE_ADMIN.name().equalsIgnoreCase(auth.getAuthority()));
 
         boolean isOwner = order.getUser() != null && userDetails.getId().equals(order.getUser().getId());
 
@@ -249,9 +250,9 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findWithDetailsById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
 
-        OrderStatus currentStatus = OrderStatus.fromString(order.getOrderStatus());
+        OrderStatus currentStatus = order.getOrderStatus();
         if (currentStatus == null) {
-            throw new BadRequestException("Trạng thái hiện tại của đơn hàng không hợp lệ: " + order.getOrderStatus());
+            throw new BadRequestException("Trạng thái hiện tại của đơn hàng không hợp lệ");
         }
 
         if (currentStatus == newStatus) {
@@ -300,22 +301,21 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // Nếu đơn hàng trước đó đã thanh toán (PAID), tự động chuyển sang REFUNDED để theo dõi đối soát
-            if (PaymentStatus.PAID.name().equalsIgnoreCase(order.getPaymentStatus())) {
-                order.setPaymentStatus(PaymentStatus.REFUNDED.name());
+            if (order.getPaymentStatus() == PaymentStatus.PAID) {
+                order.setPaymentStatus(PaymentStatus.REFUNDED);
                 log.info("Đơn hàng {} bị hủy sau khi đã thanh toán, chuyển paymentStatus sang REFUNDED", order.getOrderCode());
             }
         }
 
         // Nếu chuyển sang COMPLETED: Với đơn COD và paymentStatus đang là UNPAID -> Tự động chuyển sang PAID
         if (newStatus == OrderStatus.COMPLETED) {
-            if (PaymentMethod.COD.name().equalsIgnoreCase(order.getPaymentMethod())
-                    && PaymentStatus.UNPAID.name().equalsIgnoreCase(order.getPaymentStatus())) {
-                order.setPaymentStatus(PaymentStatus.PAID.name());
+            if (order.getPaymentMethod() == PaymentMethod.COD && order.getPaymentStatus() == PaymentStatus.UNPAID) {
+                order.setPaymentStatus(PaymentStatus.PAID);
                 log.info("Đơn hàng COD {} đã hoàn thành, tự động cập nhật paymentStatus sang PAID", order.getOrderCode());
             }
         }
 
-        order.setOrderStatus(newStatus.name());
+        order.setOrderStatus(newStatus);
         Order savedOrder = orderRepository.save(order);
 
         log.info("Cập nhật đơn hàng {} sang trạng thái {}", savedOrder.getOrderCode(), newStatus.name());
@@ -349,11 +349,11 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findWithDetailsById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
 
-        if (newStatus.name().equalsIgnoreCase(order.getPaymentStatus())) {
+        if (order.getPaymentStatus() == newStatus) {
             throw new BadRequestException("Đơn hàng đã ở trạng thái thanh toán " + newStatus.name() + " rồi");
         }
 
-        order.setPaymentStatus(newStatus.name());
+        order.setPaymentStatus(newStatus);
         Order savedOrder = orderRepository.save(order);
 
         log.info("Cập nhật trạng thái thanh toán đơn hàng {} sang {}", savedOrder.getOrderCode(), newStatus.name());

@@ -35,7 +35,7 @@ public class AuthResponse extends UserResponse {
             response.setEmail(user.getEmail());
             response.setFullName(user.getFullName());
             response.setPhone(user.getPhone());
-            response.setRole(user.getRole());
+            response.setRole(user.getRole() != null ? user.getRole().name() : null);
             response.setCreatedAt(user.getCreatedAt());
         }
         response.setAccessToken(accessToken);
