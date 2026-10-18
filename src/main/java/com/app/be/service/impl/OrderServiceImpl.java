@@ -3,10 +3,19 @@ package com.app.be.service.impl;
 import com.app.be.dto.order.CreateOrderRequest;
 import com.app.be.dto.order.OrderItemRequest;
 import com.app.be.dto.order.OrderResponse;
-import com.app.be.entity.OrderStatus;
-import com.app.be.entity.PaymentMethod;
-import com.app.be.entity.PaymentStatus;
-import com.app.be.entity.Role;
+import com.app.be.dto.common.PageResponse;
+import com.app.be.enums.OrderStatus;
+import com.app.be.enums.PaymentMethod;
+import com.app.be.enums.PaymentStatus;
+import com.app.be.enums.Role;
+import com.app.be.repository.specification.OrderSpecification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.time.LocalDate;
 import com.app.be.dto.order.TrackOrderRequest;
 import com.app.be.dto.order.UpdateOrderStatusRequest;
 import com.app.be.dto.order.UpdatePaymentStatusRequest;
@@ -220,6 +229,34 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getMyOrders(
+            CustomUserDetails userDetails,
+            int page,
+            int size,
+            OrderStatus status
+    ) {
+        if (userDetails == null || userDetails.getId() == null) {
+            throw new UnauthorizedException("Người dùng chưa được xác thực");
+        }
+
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<Order> spec = OrderSpecification.filterOrders(
+                userDetails.getId(), status, null, null, null, null
+        );
+
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(OrderResponse::fromEntity)
+                .toList();
+
+        return PageResponse.from(orderPage, content);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getMyOrders(CustomUserDetails userDetails) {
         if (userDetails == null || userDetails.getId() == null) {
             throw new UnauthorizedException("Người dùng chưa được xác thực");
@@ -229,6 +266,33 @@ public class OrderServiceImpl implements OrderService {
         return orders.stream()
                 .map(OrderResponse::fromEntity)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getAllOrders(
+            int page,
+            int size,
+            OrderStatus status,
+            PaymentStatus paymentStatus,
+            LocalDate startDate,
+            LocalDate endDate,
+            String search
+    ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<Order> spec = OrderSpecification.filterOrders(
+                null, status, paymentStatus, startDate, endDate, search
+        );
+
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+        List<OrderResponse> content = orderPage.getContent().stream()
+                .map(OrderResponse::fromEntity)
+                .toList();
+
+        return PageResponse.from(orderPage, content);
     }
 
     @Override

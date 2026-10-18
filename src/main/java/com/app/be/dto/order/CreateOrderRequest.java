@@ -1,6 +1,6 @@
 package com.app.be.dto.order;
 
-import com.app.be.entity.PaymentMethod;
+import com.app.be.enums.PaymentMethod;
 import com.app.be.validation.VnPhone;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;

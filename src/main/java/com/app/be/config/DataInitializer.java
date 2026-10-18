@@ -1,6 +1,6 @@
 package com.app.be.config;
 
-import com.app.be.entity.Role;
+import com.app.be.enums.Role;
 import com.app.be.entity.User;
 import com.app.be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

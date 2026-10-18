@@ -1,6 +1,6 @@
 package com.app.be.dto.order;
 
-import com.app.be.entity.PaymentStatus;
+import com.app.be.enums.PaymentStatus;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

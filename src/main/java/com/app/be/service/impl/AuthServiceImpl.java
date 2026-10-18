@@ -4,7 +4,7 @@ import com.app.be.dto.auth.AuthResponse;
 import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
-import com.app.be.entity.Role;
+import com.app.be.enums.Role;
 import com.app.be.entity.User;
 import com.app.be.exception.BadRequestException;
 import com.app.be.exception.DuplicateResourceException;

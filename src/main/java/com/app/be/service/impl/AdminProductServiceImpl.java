@@ -1,5 +1,6 @@
 package com.app.be.service.impl;
 
+import com.app.be.dto.common.PageResponse;
 import com.app.be.dto.product.AdminProductRequest;
 import com.app.be.dto.product.ProductDetailResponse;
 import com.app.be.dto.product.ProductSummaryResponse;
@@ -17,8 +18,13 @@ import com.app.be.service.AdminProductService;
 import com.app.be.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.app.be.repository.specification.ProductSpecification;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +40,29 @@ public class AdminProductServiceImpl implements AdminProductService {
     private final ProductVariantRepository productVariantRepository;
     private final CategoryRepository categoryRepository;
     private final OrderItemRepository orderItemRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ProductSummaryResponse> getAllProducts(
+            int page,
+            int size,
+            String keyword,
+            String categorySlug,
+            Boolean isActive
+    ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<Product> spec = ProductSpecification.filterAdminProducts(keyword, categorySlug, isActive);
+
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+        List<ProductSummaryResponse> content = productPage.getContent().stream()
+                .map(ProductSummaryResponse::fromEntity)
+                .toList();
+
+        return PageResponse.from(productPage, content);
+    }
 
     @Override
     @Transactional(readOnly = true)
