@@ -26,7 +26,7 @@ public class Product extends BaseEntity {
     @ManyToOne
     private OrderItem orderItem;
 
-    @OneToMany(mappedBy = "product")
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews;
 
     private String name;
