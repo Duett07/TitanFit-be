@@ -16,4 +16,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     @Query("SELECT COUNT(oi) > 0 FROM OrderItem oi WHERE oi.productVariant.product.id = :productId")
     boolean existsByProductVariantProductId(@Param("productId") UUID productId);
+
+    @Query("SELECT COUNT(oi) > 0 FROM OrderItem oi WHERE oi.productVariant.id = :variantId")
+    boolean existsByProductVariantId(@Param("variantId") UUID variantId);
 }
