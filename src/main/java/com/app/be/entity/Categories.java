@@ -6,7 +6,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import org.checkerframework.common.aliasing.qual.Unique;
 
 import java.util.List;
 
@@ -22,8 +21,7 @@ public class Categories extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
-    @Unique
+    @Column(nullable = false, unique = true)
     private String slug;
     private String categoryTree;
     private String imageUrl;

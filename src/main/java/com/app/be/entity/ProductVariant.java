@@ -3,7 +3,6 @@ package com.app.be.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.checkerframework.common.aliasing.qual.Unique;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,8 +20,7 @@ public class ProductVariant extends BaseEntity {
     @OneToMany(mappedBy = "productVariant")
     private List<OrderItem> orderItems;
 
-    @Column(nullable = false)
-    @Unique
+    @Column(nullable = false, unique = true)
     private String sku;
 
     @Column(nullable = false)

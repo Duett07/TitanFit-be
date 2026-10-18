@@ -1,10 +1,8 @@
 package com.app.be.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.checkerframework.common.aliasing.qual.Unique;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,11 +27,9 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
-    @Unique
+    @Column(nullable = false, unique = true)
     private String slug;
 
-    @Size
     @Column(columnDefinition = "LONGTEXT")
     private String description;
 
