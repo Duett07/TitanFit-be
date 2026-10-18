@@ -1,5 +1,6 @@
 package com.app.be.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -18,7 +19,10 @@ public class Categories extends BaseEntity {
     @OneToMany(mappedBy = "categories")
     private List<Product> products;
 
+    @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false)
     @Unique
     private String slug;
     private String categoryTree;

@@ -12,19 +12,22 @@ import java.math.BigDecimal;
 @Setter
 public class OrderItem extends BaseEntity {
 
-    @ManyToOne
-    @JoinColumn(name = "order_id")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
     @ManyToOne
     @JoinColumn(name = "variant_id")
     private ProductVariant productVariant;
 
+    @Column(nullable = false)
     private String productName;
+
     private String variantName;
 
     @Column(nullable = false)
     private BigDecimal price;
 
+    @Column(nullable = false)
     private int quantity;
 }

@@ -26,12 +26,18 @@ public class Product extends BaseEntity {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews;
 
+    @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false)
     @Unique
     private String slug;
+
     @Size
     @Column(columnDefinition = "LONGTEXT")
     private String description;
+
+    @Column(nullable = false)
     private BigDecimal basePrice;
     private String thumbnailUrl;
     private boolean isActive;
