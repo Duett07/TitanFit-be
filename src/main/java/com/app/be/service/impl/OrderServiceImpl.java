@@ -16,7 +16,6 @@ import com.app.be.enums.PaymentStatus;
 import com.app.be.exception.BadRequestException;
 import com.app.be.exception.ResourceNotFoundException;
 import com.app.be.exception.UnauthorizedException;
-import com.app.be.repository.OrderItemRepository;
 import com.app.be.repository.OrderRepository;
 import com.app.be.repository.ProductVariantRepository;
 import com.app.be.repository.UserRepository;
@@ -50,29 +49,45 @@ public class OrderServiceImpl implements OrderService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String ORDER_CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
     private static final int ORDER_CODE_LENGTH = 8;
+    private static final int MAX_GENERATE_ORDER_CODE_ATTEMPTS = 10;
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
 
     @Override
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, UUID userId) {
+        User user = resolveCustomer(userId);
+        ReservedOrderItems reserved = reserveStockAndBuildItems(request.getItems());
+        String orderCode = generateUniqueOrderCode();
+        Order order = buildOrder(request, user, orderCode, reserved.totalAmount(), reserved.items());
+
+        Order savedOrder = orderRepository.save(order);
+
+        log.info("Order created successfully with code: {} | Total: {} | Items count: {}",
+                savedOrder.getOrderCode(), savedOrder.getTotalAmount(), savedOrder.getOrderItems().size());
+
+        return OrderResponse.fromEntity(savedOrder);
+    }
+
+    private User resolveCustomer(UUID userId) {
         if (userId == null) {
             throw new UnauthorizedException(OrderMessages.LOGIN_REQUIRED);
         }
-
-        User user = userRepository.findById(userId)
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new UnauthorizedException(OrderMessages.USER_NOT_FOUND_OR_LOCKED));
+    }
 
-        // Bước 1: Sinh mã đơn hàng duy nhất: TF- + 8 ký tự Base32
-        String orderCode = generateUniqueOrderCode();
+    private record ReservedOrderItems(List<OrderItem> items, BigDecimal totalAmount) {}
 
-        // Bước 2 & 3: Gom nhóm số lượng theo variantId, sắp xếp ID để tránh deadlock khi tranh chấp lock,
-        // kiểm tra tồn kho bằng Pessimistic Lock (SELECT FOR UPDATE) và trừ kho an toàn
+    private ReservedOrderItems reserveStockAndBuildItems(List<OrderItemRequest> itemRequests) {
+        if (itemRequests == null || itemRequests.isEmpty()) {
+            throw new BadRequestException("Danh sách sản phẩm đặt hàng không được để trống");
+        }
+
         Map<UUID, Integer> aggregatedQuantities = new LinkedHashMap<>();
-        for (OrderItemRequest itemRequest : request.getItems()) {
+        for (OrderItemRequest itemRequest : itemRequests) {
             if (itemRequest.getVariantId() != null && itemRequest.getQuantity() != null) {
                 aggregatedQuantities.merge(itemRequest.getVariantId(), itemRequest.getQuantity(), Integer::sum);
             }
@@ -87,11 +102,9 @@ public class OrderServiceImpl implements OrderService {
         for (UUID variantId : sortedVariantIds) {
             int quantity = aggregatedQuantities.get(variantId);
 
-            // Khóa dòng biến thể (SELECT ... FOR UPDATE) chống race condition
             ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
                     .orElseThrow(() -> new ResourceNotFoundException(OrderMessages.VARIANT_NOT_FOUND_PREFIX + variantId));
 
-            // Kiểm tra: Sản phẩm có đang được phép kinh doanh không (isActive)
             if (variant.getProduct() == null || !variant.getProduct().isActive()) {
                 String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
                         ? variant.getProduct().getName()
@@ -99,7 +112,6 @@ public class OrderServiceImpl implements OrderService {
                 throw new BadRequestException(String.format(OrderMessages.PRODUCT_UNAVAILABLE, productName));
             }
 
-            // Kiểm tra tồn kho dưới khóa bi quan
             if (variant.getStockQuantity() < quantity) {
                 throw new BadRequestException(String.format(
                         OrderMessages.INSUFFICIENT_STOCK,
@@ -109,11 +121,8 @@ public class OrderServiceImpl implements OrderService {
                 ));
             }
 
-            // Trừ kho an toàn dưới khóa bi quan
             variant.setStockQuantity(variant.getStockQuantity() - quantity);
-            productVariantRepository.save(variant);
 
-            // Bước 3: Lấy giá trực tiếp từ database (variant.getPrice()) để tính tổng tiền
             BigDecimal unitPrice = variant.getPrice();
             if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
@@ -124,7 +133,6 @@ public class OrderServiceImpl implements OrderService {
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
             totalAmount = totalAmount.add(itemTotal);
 
-            // Chuẩn bị snapshot cho OrderItem
             OrderItem orderItem = new OrderItem();
             orderItem.setProductVariant(variant);
             String productName = (variant.getProduct() != null && variant.getProduct().getName() != null)
@@ -138,7 +146,16 @@ public class OrderServiceImpl implements OrderService {
             orderItems.add(orderItem);
         }
 
-        // Bước 4: Lưu Order với trạng thái ban đầu order_status = 'PENDING', payment_status = 'UNPAID'
+        return new ReservedOrderItems(orderItems, totalAmount);
+    }
+
+    private Order buildOrder(
+            CreateOrderRequest request,
+            User user,
+            String orderCode,
+            BigDecimal totalAmount,
+            List<OrderItem> orderItems
+    ) {
         Order order = new Order();
         order.setOrderCode(orderCode);
         order.setUser(user);
@@ -151,19 +168,11 @@ public class OrderServiceImpl implements OrderService {
         order.setPaymentStatus(PaymentStatus.UNPAID);
         order.setTotalAmount(totalAmount);
 
-        Order savedOrder = orderRepository.save(order);
-
-        // Bước 5: Lưu danh sách OrderItem lưu lại snapshot tên và giá tại thời điểm mua
         for (OrderItem item : orderItems) {
-            item.setOrder(savedOrder);
+            item.setOrder(order);
         }
-        List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
-        savedOrder.setOrderItems(savedItems);
-
-        log.info("Order created successfully with code: {} | Total: {} | Items count: {}",
-                savedOrder.getOrderCode(), savedOrder.getTotalAmount(), savedItems.size());
-
-        return OrderResponse.fromEntity(savedOrder);
+        order.setOrderItems(orderItems);
+        return order;
     }
 
     @Override
@@ -334,35 +343,8 @@ public class OrderServiceImpl implements OrderService {
             ));
         }
 
-        // Đặc biệt: Nếu newStatus == 'CANCELLED' -> Tự động duyệt qua các OrderItem và cộng hoàn trả lại stock_quantity cho từng ProductVariant!
         if (newStatus == OrderStatus.CANCELLED) {
-            if (order.getOrderItems() != null) {
-                // Gom nhóm số lượng hoàn kho theo variantId
-                Map<UUID, Integer> restoreQuantities = new LinkedHashMap<>();
-                for (OrderItem item : order.getOrderItems()) {
-                    if (item.getProductVariant() != null && item.getProductVariant().getId() != null) {
-                        restoreQuantities.merge(item.getProductVariant().getId(), item.getQuantity(), Integer::sum);
-                    }
-                }
-
-                // Sắp xếp thứ tự ID để khóa theo thứ tự nhất quán, tránh deadlock
-                List<UUID> sortedVariantIds = new ArrayList<>(restoreQuantities.keySet());
-                Collections.sort(sortedVariantIds);
-
-                for (UUID variantId : sortedVariantIds) {
-                    int qtyToRestore = restoreQuantities.get(variantId);
-                    ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
-                            .orElse(null);
-                    if (variant != null) {
-                        int currentStock = variant.getStockQuantity();
-                        int restoredStock = currentStock + qtyToRestore;
-                        variant.setStockQuantity(restoredStock);
-                        productVariantRepository.save(variant);
-                        log.info("Hoàn trả tồn kho cho SKU '{}' (ID: {}): {} + {} -> {}",
-                                variant.getSku(), variantId, currentStock, qtyToRestore, restoredStock);
-                    }
-                }
-            }
+            restoreStockForCancelledOrder(order);
 
             // Nếu đơn hàng trước đó đã thanh toán (PAID), tự động chuyển sang REFUNDED để theo dõi đối soát
             if (order.getPaymentStatus() == PaymentStatus.PAID) {
@@ -407,21 +389,52 @@ public class OrderServiceImpl implements OrderService {
         return OrderResponse.fromEntity(savedOrder);
     }
 
+    private void restoreStockForCancelledOrder(Order order) {
+        if (order.getOrderItems() == null || order.getOrderItems().isEmpty()) {
+            return;
+        }
+
+        Map<UUID, Integer> restoreQuantities = new LinkedHashMap<>();
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getProductVariant() != null && item.getProductVariant().getId() != null) {
+                restoreQuantities.merge(item.getProductVariant().getId(), item.getQuantity(), Integer::sum);
+            }
+        }
+
+        List<UUID> sortedVariantIds = new ArrayList<>(restoreQuantities.keySet());
+        Collections.sort(sortedVariantIds);
+
+        for (UUID variantId : sortedVariantIds) {
+            int qtyToRestore = restoreQuantities.get(variantId);
+            ProductVariant variant = productVariantRepository.findByIdForUpdate(variantId)
+                    .orElse(null);
+            if (variant != null) {
+                int currentStock = variant.getStockQuantity();
+                int restoredStock = currentStock + qtyToRestore;
+                variant.setStockQuantity(restoredStock);
+                log.info("Hoàn trả tồn kho cho SKU '{}' (ID: {}): {} + {} -> {}",
+                        variant.getSku(), variantId, currentStock, qtyToRestore, restoredStock);
+            }
+        }
+    }
+
     /**
      * Sinh mã đơn hàng duy nhất có độ hỗn loạn cao bằng SecureRandom
      * Định dạng: TF- + 8 ký tự alphanumeric Base32 (ví dụ: TF-7K9M2PX4)
-     * Không gian mẫu: 32^8 ~ 1.1 x 10^12 khả năng, loại bỏ nguy cơ dò quét hàng loạt.
+     * Giới hạn tối đa MAX_GENERATE_ORDER_CODE_ATTEMPTS lần thử để tránh vòng lặp vô hạn.
      */
     private String generateUniqueOrderCode() {
-        String orderCode;
-        do {
+        for (int attempt = 0; attempt < MAX_GENERATE_ORDER_CODE_ATTEMPTS; attempt++) {
             StringBuilder sb = new StringBuilder("TF-");
             for (int i = 0; i < ORDER_CODE_LENGTH; i++) {
                 int index = SECURE_RANDOM.nextInt(ORDER_CODE_CHARS.length());
                 sb.append(ORDER_CODE_CHARS.charAt(index));
             }
-            orderCode = sb.toString();
-        } while (orderRepository.existsByOrderCode(orderCode));
-        return orderCode;
+            String orderCode = sb.toString();
+            if (!orderRepository.existsByOrderCode(orderCode)) {
+                return orderCode;
+            }
+        }
+        throw new IllegalStateException("Không thể sinh mã đơn hàng duy nhất sau " + MAX_GENERATE_ORDER_CODE_ATTEMPTS + " lần thử");
     }
 }

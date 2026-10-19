@@ -36,6 +36,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AdminProductServiceImpl implements AdminProductService {
 
+    private static final int DEFAULT_VARIANT_STOCK = 50;
+    private static final int SKU_PREFIX_MAX_LENGTH = 8;
+
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
     private final CategoryRepository categoryRepository;
@@ -148,7 +151,7 @@ public class AdminProductServiceImpl implements AdminProductService {
             defVariant.setProduct(savedProduct);
             defVariant.setVariantName("Mặc định");
             defVariant.setPrice(savedProduct.getBasePrice());
-            defVariant.setStockQuantity(50);
+            defVariant.setStockQuantity(DEFAULT_VARIANT_STOCK);
             defVariant.setSku(generateUniqueSku(savedProduct.getSlug(), "DEF"));
             variants.add(defVariant);
         }
@@ -333,8 +336,8 @@ public class AdminProductServiceImpl implements AdminProductService {
         String prefix = (slug != null ? slug : "PROD")
                 .toUpperCase()
                 .replaceAll("[^A-Z0-9]", "");
-        if (prefix.length() > 8) {
-            prefix = prefix.substring(0, 8);
+        if (prefix.length() > SKU_PREFIX_MAX_LENGTH) {
+            prefix = prefix.substring(0, SKU_PREFIX_MAX_LENGTH);
         }
         String sku = "SKU-" + prefix + "-" + suffix;
         while (productVariantRepository.existsBySku(sku)) {
