@@ -21,21 +21,7 @@ import java.util.UUID;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecificationExecutor<Order> {
 
-    Optional<Order> findByOrderCode(String orderCode);
-
     boolean existsByOrderCode(String orderCode);
-
-    Page<Order> findByUser_Id(UUID userId, Pageable pageable);
-
-    List<Order> findByUser_Id(UUID userId);
-
-    Page<Order> findByOrderStatus(OrderStatus orderStatus, Pageable pageable);
-
-    Page<Order> findByUser_IdAndOrderStatus(UUID userId, OrderStatus orderStatus, Pageable pageable);
-
-    Page<Order> findByUser_IdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
-
-    Page<Order> findByUser_IdAndOrderStatusOrderByCreatedAtDesc(UUID userId, OrderStatus orderStatus, Pageable pageable);
 
     @EntityGraph(attributePaths = {"orderItems", "orderItems.productVariant"})
     List<Order> findByUser_IdOrderByCreatedAtDesc(UUID userId);
