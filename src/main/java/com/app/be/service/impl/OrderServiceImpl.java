@@ -43,7 +43,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -54,6 +53,16 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
+
+    public OrderServiceImpl(
+            OrderRepository orderRepository,
+            ProductVariantRepository productVariantRepository,
+            UserRepository userRepository
+    ) {
+        this.orderRepository = orderRepository;
+        this.productVariantRepository = productVariantRepository;
+        this.userRepository = userRepository;
+    }
 
     @Override
     @Transactional
