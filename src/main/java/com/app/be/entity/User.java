@@ -1,6 +1,7 @@
 package com.app.be.entity;
 
 import com.app.be.enums.Role;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,6 +25,9 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "user")
     private List<Review> reviews;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Address> addresses;
+
     @Column(nullable = false, unique = true)
     private String email;
 
@@ -34,6 +38,10 @@ public class User extends BaseEntity {
     private String fullName;
 
     private String phone;
+
+    private String gender;
+
+    private String dateOfBirth;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
