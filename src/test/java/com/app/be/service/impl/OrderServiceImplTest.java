@@ -17,7 +17,6 @@ import com.app.be.enums.Role;
 import com.app.be.exception.BadRequestException;
 import com.app.be.exception.ResourceNotFoundException;
 import com.app.be.exception.UnauthorizedException;
-import com.app.be.repository.OrderItemRepository;
 import com.app.be.repository.OrderRepository;
 import com.app.be.repository.ProductVariantRepository;
 import com.app.be.repository.UserRepository;
@@ -50,9 +49,6 @@ class OrderServiceImplTest {
 
     @Mock
     private OrderRepository orderRepository;
-
-    @Mock
-    private OrderItemRepository orderItemRepository;
 
     @Mock
     private ProductVariantRepository productVariantRepository;
@@ -119,7 +115,6 @@ class OrderServiceImplTest {
             when(userRepository.findById(sampleUserId)).thenReturn(Optional.of(sampleUser));
             when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
             when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
-            when(productVariantRepository.save(any(ProductVariant.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
                 Order orderToSave = invocation.getArgument(0);
@@ -127,8 +122,6 @@ class OrderServiceImplTest {
                 orderToSave.setCreatedAt(LocalDateTime.now());
                 return orderToSave;
             });
-
-            when(orderItemRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
             // Act
             OrderResponse response = orderService.createOrder(request, sampleUserId);
@@ -142,7 +135,6 @@ class OrderServiceImplTest {
 
             // Verify variant stock deduction
             assertThat(variant.getStockQuantity()).isEqualTo(8);
-            verify(productVariantRepository).save(variant);
 
             // Verify Order saved
             ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -192,7 +184,6 @@ class OrderServiceImplTest {
             variant.setStockQuantity(10);
 
             when(userRepository.findById(sampleUserId)).thenReturn(Optional.of(sampleUser));
-            when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
             when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
 
             assertThatThrownBy(() -> orderService.createOrder(request, sampleUserId))
@@ -218,7 +209,6 @@ class OrderServiceImplTest {
             variant.setStockQuantity(3); // Chi co 3 trong kho, khach dat 10
 
             when(userRepository.findById(sampleUserId)).thenReturn(Optional.of(sampleUser));
-            when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
             when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
 
             assertThatThrownBy(() -> orderService.createOrder(request, sampleUserId))
@@ -244,12 +234,39 @@ class OrderServiceImplTest {
             variant.setStockQuantity(10);
 
             when(userRepository.findById(sampleUserId)).thenReturn(Optional.of(sampleUser));
-            when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
             when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
 
             assertThatThrownBy(() -> orderService.createOrder(request, sampleUserId))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("chưa có giá hợp lệ");
+        }
+
+        @Test
+        @DisplayName("createOrder: Nem IllegalStateException khi sinh ma don hang vuot qua so lan thu toi da")
+        void createOrder_ThrowsIllegalStateException_WhenOrderCodeGenerationExceedsMaxAttempts() {
+            UUID variantId = UUID.randomUUID();
+            CreateOrderRequest request = createSampleRequest(variantId, 1);
+
+            Product product = new Product();
+            product.setName("Titan Protein Whey");
+            product.setActive(true);
+
+            ProductVariant variant = new ProductVariant();
+            variant.setId(variantId);
+            variant.setProduct(product);
+            variant.setVariantName("Hu 2kg Socola");
+            variant.setPrice(BigDecimal.valueOf(500000));
+            variant.setStockQuantity(10);
+
+            when(userRepository.findById(sampleUserId)).thenReturn(Optional.of(sampleUser));
+            when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
+            when(orderRepository.existsByOrderCode(anyString())).thenReturn(true);
+
+            assertThatThrownBy(() -> orderService.createOrder(request, sampleUserId))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("10 lần thử");
+
+            verify(orderRepository, times(10)).existsByOrderCode(anyString());
         }
     }
 
@@ -314,7 +331,6 @@ class OrderServiceImplTest {
 
             when(orderRepository.findWithDetailsById(orderId)).thenReturn(Optional.of(order));
             when(productVariantRepository.findByIdForUpdate(variantId)).thenReturn(Optional.of(variant));
-            when(productVariantRepository.save(any(ProductVariant.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             // Act
@@ -326,7 +342,6 @@ class OrderServiceImplTest {
 
             // Stock restored: 5 + 3 = 8
             assertThat(variant.getStockQuantity()).isEqualTo(8);
-            verify(productVariantRepository).save(variant);
         }
 
         @Test

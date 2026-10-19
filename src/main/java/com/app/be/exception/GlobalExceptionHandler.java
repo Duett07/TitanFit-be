@@ -4,7 +4,7 @@ import com.app.be.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
-import org.apache.catalina.connector.ClientAbortException;
+import java.io.IOException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -152,9 +152,19 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(HttpStatus.NOT_FOUND.value(), "Không tìm thấy tài nguyên: " + ex.getResourcePath()));
     }
 
-    @ExceptionHandler({AsyncRequestNotUsableException.class, ClientAbortException.class})
-    public void handleClientAbortException(Exception ex) {
-        log.debug("Client ngắt kết nối trước khi nhận response (Client abort / Broken pipe): {}", ex.getMessage());
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsableException(AsyncRequestNotUsableException ex) {
+        log.debug("Client ngắt kết nối trước khi nhận response (Async request not usable): {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(IOException.class)
+    public void handleIOException(IOException ex) {
+        String message = ex.getMessage();
+        if (message != null && (message.contains("Broken pipe") || message.contains("Connection reset"))) {
+            log.debug("Client ngắt kết nối trước khi nhận response (Broken pipe / Connection reset): {}", message);
+            return;
+        }
+        log.error("Lỗi I/O ngoại lệ: ", ex);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -192,9 +202,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex) {
         // Nếu là lỗi client ngắt kết nối hoặc Broken pipe được bọc trong exception khác
-        if (ex.getCause() instanceof ClientAbortException || (ex.getMessage() != null && ex.getMessage().contains("Broken pipe"))) {
+        Throwable cause = ex.getCause();
+        if ((cause instanceof IOException && cause.getMessage() != null && (cause.getMessage().contains("Broken pipe") || cause.getMessage().contains("Connection reset")))
+                || (ex.getMessage() != null && (ex.getMessage().contains("Broken pipe") || ex.getMessage().contains("Connection reset")))) {
             log.debug("Client ngắt kết nối (Broken pipe): {}", ex.getMessage());
-            return null;
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Client connection aborted"));
         }
 
         log.error("Internal Server Error: ", ex);
