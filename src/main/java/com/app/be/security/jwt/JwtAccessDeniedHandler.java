@@ -12,14 +12,25 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import java.io.IOException;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public JwtAccessDeniedHandler(@Autowired(required = false) ObjectMapper objectMapper) {
+        if (objectMapper != null) {
+            this.objectMapper = objectMapper;
+        } else {
+            ObjectMapper fallback = new ObjectMapper();
+            fallback.findAndRegisterModules();
+            this.objectMapper = fallback;
+        }
+    }
 
     @Override
     public void handle(

@@ -12,14 +12,25 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import java.io.IOException;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public JwtAuthenticationEntryPoint(@Autowired(required = false) ObjectMapper objectMapper) {
+        if (objectMapper != null) {
+            this.objectMapper = objectMapper;
+        } else {
+            ObjectMapper fallback = new ObjectMapper();
+            fallback.findAndRegisterModules();
+            this.objectMapper = fallback;
+        }
+    }
 
     @Override
     public void commence(HttpServletRequest request,
