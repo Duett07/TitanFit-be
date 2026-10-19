@@ -77,8 +77,11 @@ public class SecurityConfig {
                         // Customer endpoints - All other order endpoints require authentication
                         .requestMatchers("/api/orders", "/api/orders/**").authenticated()
 
-                        // Auth me endpoint (requires authentication)
-                        .requestMatchers("/api/auth/me").authenticated()
+                        // Authenticated auth endpoints (Profile & Security)
+                        .requestMatchers("/api/auth/me", "/api/auth/profile", "/api/auth/change-password").authenticated()
+
+                        // Address endpoints
+                        .requestMatchers("/api/users/addresses", "/api/users/addresses/**").authenticated()
 
                         // Public endpoints
                         .requestMatchers("/api/auth/**").permitAll()

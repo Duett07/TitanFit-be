@@ -4,6 +4,8 @@ import com.app.be.dto.auth.AuthResponse;
 import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
+import com.app.be.dto.auth.UpdateProfileRequest;
+import com.app.be.dto.auth.ChangePasswordRequest;
 import com.app.be.enums.Role;
 import com.app.be.entity.User;
 import com.app.be.exception.BadRequestException;
@@ -200,19 +202,6 @@ public class AuthServiceImpl implements AuthService {
         logout(null, response);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public UserResponse getCurrentUser(UUID userId) {
-        if (userId == null) {
-            throw new UnauthorizedException("Người dùng chưa được xác thực");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UnauthorizedException("Tài khoản người dùng không tồn tại hoặc đã bị khoá/xoá"));
-
-        return UserResponse.fromEntity(user);
-    }
-
     private void addTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
                 .httpOnly(true)
@@ -278,5 +267,56 @@ public class AuthServiceImpl implements AuthService {
             }
         }
         return null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getProfile(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
+        return UserResponse.fromEntity(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
+
+        if (StringUtils.hasText(request.getFullName())) {
+            user.setFullName(request.getFullName().trim());
+        }
+        if (StringUtils.hasText(request.getPhoneNumber())) {
+            user.setPhone(request.getPhoneNumber().trim());
+        } else if (StringUtils.hasText(request.getPhone())) {
+            user.setPhone(request.getPhone().trim());
+        }
+        if (StringUtils.hasText(request.getGender())) {
+            user.setGender(request.getGender().trim());
+        }
+        if (StringUtils.hasText(request.getDateOfBirth())) {
+            user.setDateOfBirth(request.getDateOfBirth().trim());
+        }
+
+        User saved = userRepository.save(user);
+        return UserResponse.fromEntity(saved);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BadRequestException("Mật khẩu hiện tại không chính xác");
+        }
+
+        if (!StringUtils.hasText(request.getNewPassword()) || request.getNewPassword().length() < 6) {
+            throw new BadRequestException("Mật khẩu mới phải có tối thiểu 6 ký tự");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }

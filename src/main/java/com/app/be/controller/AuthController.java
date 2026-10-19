@@ -6,8 +6,12 @@ import com.app.be.dto.auth.LoginRequest;
 import com.app.be.dto.auth.RefreshTokenRequest;
 import com.app.be.dto.auth.RegisterRequest;
 import com.app.be.dto.auth.UserResponse;
-import com.app.be.security.ratelimit.RateLimiterService;
+import com.app.be.dto.auth.UpdateProfileRequest;
+import com.app.be.dto.auth.ChangePasswordRequest;
+import com.app.be.exception.UnauthorizedException;
 import com.app.be.security.user.CustomUserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.app.be.security.ratelimit.RateLimiterService;
 import com.app.be.service.AuthService;
 import com.app.be.util.ClientIpUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,11 +20,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -83,9 +84,37 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        UUID userId = userDetails != null ? userDetails.getId() : null;
-        return ResponseEntity
-                .ok(ApiResponse.success("Lấy thông tin tài khoản thành công", authService.getCurrentUser(userId)));
+    public ResponseEntity<ApiResponse<UserResponse>> getProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        if (userDetails == null) {
+            throw new UnauthorizedException("Chưa đăng nhập");
+        }
+        UserResponse response = authService.getProfile(userDetails.getId());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin người dùng thành công", response));
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        if (userDetails == null) {
+            throw new UnauthorizedException("Chưa đăng nhập");
+        }
+        UserResponse response = authService.updateProfile(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin hồ sơ thành công", response));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        if (userDetails == null) {
+            throw new UnauthorizedException("Chưa đăng nhập");
+        }
+        authService.changePassword(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu tài khoản thành công", null));
     }
 }
