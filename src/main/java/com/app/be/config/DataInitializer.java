@@ -77,7 +77,7 @@ public class DataInitializer implements CommandLineRunner {
         if (!isDevEnvironment()) {
             validateProductionAdminPassword(adminPassword);
         } else if (adminPassword != null && isWeakPassword(adminPassword)) {
-            log.warn("⚠️ DEVELOPMENT MODE: Default/weak admin password detected for [{}]. DO NOT USE IN PRODUCTION!", email);
+            log.warn("DEVELOPMENT MODE: Default/weak admin password detected for [{}]. DO NOT USE IN PRODUCTION!", email);
         }
 
         if (!userRepository.existsByEmail(email)) {
