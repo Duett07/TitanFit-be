@@ -4,6 +4,7 @@ import com.app.be.security.user.CustomUserDetailsService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -82,15 +83,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Chỉ chấp nhận Access Token qua Authorization: Bearer <token> Header.
-     * Không đọc Access Token từ Cookie để loại trừ hoàn toàn nguy cơ tấn công CSRF (Cross-Site Request Forgery)
-     * khi gọi các API được bảo vệ.
+     * Trích xuất Access Token theo cơ chế Dual-Auth:
+     * 1. Ưu tiên đọc từ Header Authorization: Bearer <token> (Dành cho Mobile, Postman, hoặc SPA gửi qua header).
+     * 2. Fallback đọc từ HttpOnly Cookie "accessToken" (Dành cho trình duyệt web, Next.js/React gửi kèm credentials).
      */
     private String parseJwt(HttpServletRequest request) {
         String headerAuth = request.getHeader("Authorization");
 
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
+        }
+
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
+                    return cookie.getValue();
+                }
+            }
         }
 
         return null;
