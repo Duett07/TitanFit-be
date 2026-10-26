@@ -87,6 +87,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/product/**", "/api/reviews/eligibility/**").permitAll()
+
+                        // Review creation and personal reviews
+                        .requestMatchers("/api/reviews", "/api/reviews/**").authenticated()
 
                         // Swagger / OpenAPI documentation (Công khai ở dev; yêu cầu ROLE_ADMIN khi tắt/production)
                         .requestMatchers(

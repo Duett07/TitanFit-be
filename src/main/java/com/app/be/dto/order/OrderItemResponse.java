@@ -19,6 +19,8 @@ public class OrderItemResponse {
 
     private UUID id;
     private UUID variantId;
+    private UUID productId;
+    private String productSlug;
     private String productName;
     private String variantName;
     private BigDecimal price;
@@ -32,9 +34,18 @@ public class OrderItemResponse {
         BigDecimal price = item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO;
         BigDecimal total = price.multiply(BigDecimal.valueOf(item.getQuantity()));
 
+        UUID productId = null;
+        String productSlug = null;
+        if (item.getProductVariant() != null && item.getProductVariant().getProduct() != null) {
+            productId = item.getProductVariant().getProduct().getId();
+            productSlug = item.getProductVariant().getProduct().getSlug();
+        }
+
         return OrderItemResponse.builder()
                 .id(item.getId())
                 .variantId(item.getProductVariant() != null ? item.getProductVariant().getId() : null)
+                .productId(productId)
+                .productSlug(productSlug)
                 .productName(item.getProductName())
                 .variantName(item.getVariantName())
                 .price(price)

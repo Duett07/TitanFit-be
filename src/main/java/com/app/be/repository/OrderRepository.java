@@ -23,20 +23,20 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
 
     boolean existsByOrderCode(String orderCode);
 
-    @EntityGraph(attributePaths = {"orderItems", "orderItems.productVariant"})
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.productVariant", "orderItems.productVariant.product"})
     List<Order> findByUser_IdOrderByCreatedAtDesc(UUID userId);
 
-    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant"})
+    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant", "orderItems.productVariant.product"})
     List<Order> findAllByOrderByCreatedAtDesc();
 
-    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant"})
+    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant", "orderItems.productVariant.product"})
     Optional<Order> findWithDetailsById(UUID id);
 
-    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant"})
+    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant", "orderItems.productVariant.product"})
     Optional<Order> findWithDetailsByOrderCode(String orderCode);
 
     @Override
-    @EntityGraph(attributePaths = {"user"})
+    @EntityGraph(attributePaths = {"user", "orderItems", "orderItems.productVariant", "orderItems.productVariant.product"})
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
 
     long countByOrderStatus(OrderStatus orderStatus);
